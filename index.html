@@ -284,10 +284,6 @@
     <div class="marca">Mi Cuenta</div>
     <div class="marca-sub">Consulta tu saldo y juega tus números</div>
     <div class="tarjeta-acceso">
-        <div class="tabs-acceso">
-            <div class="tab-acceso activo" id="tabLogin" onclick="cambiarTabAcceso('login')">Iniciar sesión</div>
-            <div class="tab-acceso" id="tabRegistro" onclick="cambiarTabAcceso('registro')">Crear cuenta</div>
-        </div>
         <div id="mensajeAcceso"></div>
 
         <div id="formLogin">
@@ -300,22 +296,9 @@
                 <input type="password" id="loginPassword" autocomplete="current-password">
             </div>
             <button class="boton" id="btnLogin" onclick="iniciarSesion()">Entrar</button>
-        </div>
-
-        <div id="formRegistro" style="display:none;">
-            <div class="campo">
-                <label>Nombre completo</label>
-                <input type="text" id="regNombre">
-            </div>
-            <div class="campo">
-                <label>Usuario</label>
-                <input type="text" id="regUsuario">
-            </div>
-            <div class="campo">
-                <label>Contraseña</label>
-                <input type="password" id="regPassword">
-            </div>
-            <button class="boton boton-oro" id="btnRegistro" onclick="crearCuenta()">Crear mi cuenta</button>
+            <p style="text-align:center; font-size:0.8em; color:var(--ink-soft); margin-top:16px;">
+                ¿No tienes cuenta? Pídela en el puesto.
+            </p>
         </div>
     </div>
 </div>
@@ -402,7 +385,7 @@
     // =====================================================================
     // CONFIGURACIÓN — reemplaza esto por la URL real de tu Worker desplegado
     // =====================================================================
-    const WORKER_URL = 'https://ventas-clientes-worker.watsonmraul.workers.dev/';
+    const WORKER_URL = 'https://TU-WORKER.workers.dev';
 
     let token = localStorage.getItem('token_cliente') || null;
     let sorteoSeleccionado = null;
@@ -425,14 +408,6 @@
     // ---------------------------------------------------------------
     // Pantalla de acceso: tabs, login, registro
     // ---------------------------------------------------------------
-    function cambiarTabAcceso(cual) {
-        document.getElementById('tabLogin').classList.toggle('activo', cual === 'login');
-        document.getElementById('tabRegistro').classList.toggle('activo', cual === 'registro');
-        document.getElementById('formLogin').style.display = cual === 'login' ? 'block' : 'none';
-        document.getElementById('formRegistro').style.display = cual === 'registro' ? 'block' : 'none';
-        document.getElementById('mensajeAcceso').innerHTML = '';
-    }
-
     async function iniciarSesion() {
         const usuario = document.getElementById('loginUsuario').value.trim();
         const password = document.getElementById('loginPassword').value;
@@ -454,30 +429,6 @@
         token = data.token;
         localStorage.setItem('token_cliente', token);
         entrarAlApp(data.nombre);
-    }
-
-    async function crearCuenta() {
-        const nombre = document.getElementById('regNombre').value.trim();
-        const usuario = document.getElementById('regUsuario').value.trim();
-        const password = document.getElementById('regPassword').value;
-        const msj = document.getElementById('mensajeAcceso');
-        if (!nombre || !usuario || !password) {
-            msj.innerHTML = '<div class="mensaje error">Completa todos los campos</div>';
-            return;
-        }
-        document.getElementById('btnRegistro').disabled = true;
-        const data = await api('/api/clientes/registro', {
-            method: 'POST',
-            body: JSON.stringify({ nombre, usuario, password })
-        });
-        document.getElementById('btnRegistro').disabled = false;
-        if (!data.ok) {
-            msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
-            return;
-        }
-        token = data.token;
-        localStorage.setItem('token_cliente', token);
-        entrarAlApp(nombre);
     }
 
     function cerrarSesion() {
