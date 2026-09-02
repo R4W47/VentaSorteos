@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Cuenta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --navy: #1B2A4A;
+        --navy-soft: #2A3D63;
+        --gold: #C89B4C;
+        --gold-soft: #E8D5AC;
+        --paper: #FAF7F1;
+        --card: #FFFFFF;
+        --ink: #2A2E35;
+        --ink-soft: #6B7078;
+        --success: #3F8F5F;
+        --error: #C1443C;
+        --border: #E7E1D6;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+        font-family: 'Inter', sans-serif;
+        background: var(--paper);
+        color: var(--ink);
+        min-height: 100vh;
+        padding-bottom: 40px;
+    }
+    .num { font-family: 'Fraunces', serif; }
+
+    /* ---------- Pantalla de acceso ---------- */
+    #pantallaAcceso {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 24px;
+        background: var(--navy);
+    }
+    .marca {
+        color: var(--gold);
+        font-family: 'Fraunces', serif;
+        font-size: 2em;
+        font-weight: 600;
+        margin-bottom: 6px;
+        text-align: center;
+    }
+    .marca-sub {
+        color: #C7CEDD;
+        font-size: 0.9em;
+        margin-bottom: 32px;
+        text-align: center;
+    }
+    .tarjeta-acceso {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 28px 24px;
+        width: 100%;
+        max-width: 380px;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+    }
+    .tabs-acceso {
+        display: flex;
+        margin-bottom: 22px;
+        border-bottom: 2px solid var(--border);
+    }
+    .tab-acceso {
+        flex: 1;
+        text-align: center;
+        padding: 10px 0;
+        font-weight: 600;
+        color: var(--ink-soft);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+    }
+    .tab-acceso.activo {
+        color: var(--navy);
+        border-bottom-color: var(--gold);
+    }
+    .campo { margin-bottom: 14px; }
+    .campo label {
+        display: block;
+        font-size: 0.82em;
+        font-weight: 600;
+        color: var(--ink-soft);
+        margin-bottom: 6px;
+    }
+    .campo input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+    }
+    .campo input:focus {
+        outline: none;
+        border-color: var(--navy);
+    }
+    .boton {
+        width: 100%;
+        padding: 13px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        background: var(--navy);
+        color: white;
+    }
+    .boton:disabled { opacity: 0.5; cursor: not-allowed; }
+    .boton-oro { background: var(--gold); color: var(--navy); }
+    .boton-linea {
+        background: transparent;
+        border: 1.5px solid var(--navy);
+        color: var(--navy);
+    }
+    .mensaje {
+        font-size: 0.85em;
+        padding: 10px 12px;
+        border-radius: 8px;
+        margin-bottom: 14px;
+    }
+    .mensaje.error { background: #FBEAE8; color: var(--error); }
+    .mensaje.exito { background: #E7F3EC; color: var(--success); }
+
+    /* ---------- App principal ---------- */
+    #app { display: none; }
+    header.principal {
+        background: var(--navy);
+        padding: 28px 20px 60px;
+        border-radius: 0 0 28px 28px;
+        position: relative;
+    }
+    .fila-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 22px;
+    }
+    .saludo { color: #C7CEDD; font-size: 0.9em; }
+    .btn-salir {
+        background: rgba(255,255,255,0.12);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 0.8em;
+        cursor: pointer;
+    }
+    .saldo-label {
+        color: #9FAAC4;
+        font-size: 0.85em;
+        margin-bottom: 4px;
+    }
+    .saldo-monto {
+        color: white;
+        font-size: 2.6em;
+        font-weight: 600;
+        line-height: 1;
+    }
+    .contenido {
+        max-width: 480px;
+        margin: -40px auto 0;
+        padding: 0 16px;
+    }
+    .seccion-titulo {
+        font-size: 0.95em;
+        font-weight: 700;
+        color: var(--navy);
+        margin: 26px 4px 12px;
+    }
+    .tarjeta {
+        background: var(--card);
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 14px rgba(27,42,74,0.08);
+    }
+    .sorteo-tarjeta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: transform 0.1s ease;
+    }
+    .sorteo-tarjeta:active { transform: scale(0.98); }
+    .sorteo-nombre { font-weight: 600; }
+    .sorteo-hora { font-size: 0.8em; color: var(--ink-soft); margin-top: 2px; }
+    .sorteo-multiplicador {
+        font-family: 'Fraunces', serif;
+        color: var(--gold);
+        font-weight: 700;
+        font-size: 1.3em;
+    }
+    .vacio {
+        text-align: center;
+        color: var(--ink-soft);
+        padding: 30px 10px;
+        font-size: 0.9em;
+    }
+
+    /* ---------- Modal de compra ---------- */
+    .fondo-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(27,42,74,0.5);
+        z-index: 50;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    .fondo-modal.visible { display: flex; }
+    .hoja-modal {
+        background: var(--card);
+        width: 100%;
+        max-width: 480px;
+        border-radius: 20px 20px 0 0;
+        padding: 24px 20px 30px;
+    }
+    .hoja-modal h3 { font-family: 'Fraunces', serif; margin-bottom: 4px; }
+    .hoja-modal .sub { color: var(--ink-soft); font-size: 0.85em; margin-bottom: 20px; }
+    .campo-numero-grande input {
+        width: 100%;
+        text-align: center;
+        font-family: 'Fraunces', serif;
+        font-size: 2.4em;
+        padding: 12px;
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        letter-spacing: 4px;
+    }
+    .fila-botones { display: flex; gap: 10px; margin-top: 18px; }
+    .fila-botones .boton { flex: 1; }
+
+    /* ---------- Navegación inferior ---------- */
+    nav.inferior {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: var(--card);
+        border-top: 1px solid var(--border);
+        display: flex;
+        padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+        z-index: 40;
+    }
+    nav.inferior button {
+        flex: 1;
+        background: none;
+        border: none;
+        font-family: inherit;
+        font-size: 0.75em;
+        color: var(--ink-soft);
+        padding: 6px 0;
+        cursor: pointer;
+    }
+    nav.inferior button.activo { color: var(--navy); font-weight: 700; }
+
+    .historial-fila {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.9em;
+    }
+    .historial-fila:last-child { border-bottom: none; }
+    .historial-tipo { font-weight: 600; }
+    .historial-fecha { color: var(--ink-soft); font-size: 0.78em; margin-top: 2px; }
+    .monto-positivo { color: var(--success); font-family: 'Fraunces', serif; font-weight: 600; }
+    .monto-negativo { color: var(--error); font-family: 'Fraunces', serif; font-weight: 600; }
+
+    .pantalla { display: none; padding-bottom: 90px; }
+    .pantalla.activa { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ==================== PANTALLA DE ACCESO ==================== -->
+<div id="pantallaAcceso">
+    <div class="marca">Mi Cuenta</div>
+    <div class="marca-sub">Consulta tu saldo y juega tus números</div>
+    <div class="tarjeta-acceso">
+        <div class="tabs-acceso">
+            <div class="tab-acceso activo" id="tabLogin" onclick="cambiarTabAcceso('login')">Iniciar sesión</div>
+            <div class="tab-acceso" id="tabRegistro" onclick="cambiarTabAcceso('registro')">Crear cuenta</div>
+        </div>
+        <div id="mensajeAcceso"></div>
+
+        <div id="formLogin">
+            <div class="campo">
+                <label>Usuario</label>
+                <input type="text" id="loginUsuario" autocomplete="username">
+            </div>
+            <div class="campo">
+                <label>Contraseña</label>
+                <input type="password" id="loginPassword" autocomplete="current-password">
+            </div>
+            <button class="boton" id="btnLogin" onclick="iniciarSesion()">Entrar</button>
+        </div>
+
+        <div id="formRegistro" style="display:none;">
+            <div class="campo">
+                <label>Nombre completo</label>
+                <input type="text" id="regNombre">
+            </div>
+            <div class="campo">
+                <label>Usuario</label>
+                <input type="text" id="regUsuario">
+            </div>
+            <div class="campo">
+                <label>Contraseña</label>
+                <input type="password" id="regPassword">
+            </div>
+            <button class="boton boton-oro" id="btnRegistro" onclick="crearCuenta()">Crear mi cuenta</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== APP PRINCIPAL ==================== -->
+<div id="app">
+    <header class="principal">
+        <div class="fila-top">
+            <div class="saludo" id="saludoNombre">Hola</div>
+            <button class="btn-salir" onclick="cerrarSesion()">Salir</button>
+        </div>
+        <div class="saldo-label">Tu saldo disponible</div>
+        <div class="saldo-monto num">C$<span id="saldoMonto">0.00</span></div>
+    </header>
+
+    <div class="contenido">
+
+        <!-- ---- Pantalla: Inicio (sorteos) ---- -->
+        <div class="pantalla activa" id="pantallaInicio">
+            <div class="seccion-titulo">Sorteos abiertos</div>
+            <div id="listaSorteos"><div class="vacio">Cargando sorteos...</div></div>
+        </div>
+
+        <!-- ---- Pantalla: Historial ---- -->
+        <div class="pantalla" id="pantallaHistorial">
+            <div class="seccion-titulo">Historial</div>
+            <div class="tarjeta" id="listaHistorial">
+                <div class="vacio">Cargando historial...</div>
+            </div>
+        </div>
+
+        <!-- ---- Pantalla: Recargar ---- -->
+        <div class="pantalla" id="pantallaRecargar">
+            <div class="seccion-titulo">Recargar saldo</div>
+            <div class="tarjeta">
+                <p style="font-size:0.9em; color:var(--ink-soft); margin-bottom:14px;">
+                    Puedes recargar en efectivo directamente en el puesto, o subir
+                    el comprobante de tu pago aquí para que lo aprobemos.
+                </p>
+                <div id="mensajeRecarga"></div>
+                <div class="campo">
+                    <label>Monto recargado (C$)</label>
+                    <input type="number" id="recargaMonto" min="1">
+                </div>
+                <div class="campo">
+                    <label>Enlace del comprobante</label>
+                    <input type="text" id="recargaComprobante" placeholder="Enlace a la imagen del comprobante">
+                </div>
+                <button class="boton boton-oro" onclick="enviarComprobante()">Enviar comprobante</button>
+            </div>
+        </div>
+
+    </div>
+
+    <nav class="inferior">
+        <button class="activo" id="navInicio" onclick="cambiarPantalla('Inicio')">Sorteos</button>
+        <button id="navHistorial" onclick="cambiarPantalla('Historial')">Historial</button>
+        <button id="navRecargar" onclick="cambiarPantalla('Recargar')">Recargar</button>
+    </nav>
+</div>
+
+<!-- ==================== MODAL: COMPRAR NÚMERO ==================== -->
+<div class="fondo-modal" id="fondoModalCompra">
+    <div class="hoja-modal">
+        <h3 id="modalSorteoNombre">Sorteo</h3>
+        <div class="sub" id="modalSorteoInfo">Paga x0 tu apuesta</div>
+        <div id="mensajeCompra"></div>
+        <div class="campo campo-numero-grande">
+            <label>Número</label>
+            <input type="text" id="compraNumero" maxlength="2" inputmode="numeric" placeholder="00">
+        </div>
+        <div class="campo">
+            <label>Monto a jugar (C$)</label>
+            <input type="number" id="compraMonto" min="1">
+        </div>
+        <div class="fila-botones">
+            <button class="boton boton-linea" onclick="cerrarModalCompra()">Cancelar</button>
+            <button class="boton boton-oro" id="btnConfirmarCompra" onclick="confirmarCompra()">Jugar número</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // =====================================================================
+    // CONFIGURACIÓN — reemplaza esto por la URL real de tu Worker desplegado
+    // =====================================================================
+    const WORKER_URL = 'https://TU-WORKER.workers.dev';
+
+    let token = localStorage.getItem('token_cliente') || null;
+    let sorteoSeleccionado = null;
+    let sorteosCache = [];
+
+    // ---------------------------------------------------------------
+    // Utilidades de llamadas a la API
+    // ---------------------------------------------------------------
+    async function api(ruta, opciones = {}) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const resp = await fetch(WORKER_URL + ruta, { ...opciones, headers });
+        return resp.json();
+    }
+
+    function num(n) {
+        return (n || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 });
+    }
+
+    // ---------------------------------------------------------------
+    // Pantalla de acceso: tabs, login, registro
+    // ---------------------------------------------------------------
+    function cambiarTabAcceso(cual) {
+        document.getElementById('tabLogin').classList.toggle('activo', cual === 'login');
+        document.getElementById('tabRegistro').classList.toggle('activo', cual === 'registro');
+        document.getElementById('formLogin').style.display = cual === 'login' ? 'block' : 'none';
+        document.getElementById('formRegistro').style.display = cual === 'registro' ? 'block' : 'none';
+        document.getElementById('mensajeAcceso').innerHTML = '';
+    }
+
+    async function iniciarSesion() {
+        const usuario = document.getElementById('loginUsuario').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const msj = document.getElementById('mensajeAcceso');
+        if (!usuario || !password) {
+            msj.innerHTML = '<div class="mensaje error">Completa usuario y contraseña</div>';
+            return;
+        }
+        document.getElementById('btnLogin').disabled = true;
+        const data = await api('/api/clientes/login', {
+            method: 'POST',
+            body: JSON.stringify({ usuario, password })
+        });
+        document.getElementById('btnLogin').disabled = false;
+        if (!data.ok) {
+            msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
+            return;
+        }
+        token = data.token;
+        localStorage.setItem('token_cliente', token);
+        entrarAlApp(data.nombre);
+    }
+
+    async function crearCuenta() {
+        const nombre = document.getElementById('regNombre').value.trim();
+        const usuario = document.getElementById('regUsuario').value.trim();
+        const password = document.getElementById('regPassword').value;
+        const msj = document.getElementById('mensajeAcceso');
+        if (!nombre || !usuario || !password) {
+            msj.innerHTML = '<div class="mensaje error">Completa todos los campos</div>';
+            return;
+        }
+        document.getElementById('btnRegistro').disabled = true;
+        const data = await api('/api/clientes/registro', {
+            method: 'POST',
+            body: JSON.stringify({ nombre, usuario, password })
+        });
+        document.getElementById('btnRegistro').disabled = false;
+        if (!data.ok) {
+            msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
+            return;
+        }
+        token = data.token;
+        localStorage.setItem('token_cliente', token);
+        entrarAlApp(nombre);
+    }
+
+    function cerrarSesion() {
+        localStorage.removeItem('token_cliente');
+        token = null;
+        document.getElementById('app').style.display = 'none';
+        document.getElementById('pantallaAcceso').style.display = 'flex';
+    }
+
+    function entrarAlApp(nombre) {
+        document.getElementById('pantallaAcceso').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('saludoNombre').textContent = nombre ? `Hola, ${nombre}` : 'Hola';
+        cargarSaldo();
+        cargarSorteos();
+    }
+
+    // ---------------------------------------------------------------
+    // Saldo
+    // ---------------------------------------------------------------
+    async function cargarSaldo() {
+        const data = await api('/api/clientes/saldo');
+        if (data.ok) {
+            document.getElementById('saldoMonto').textContent = num(data.saldo);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Navegación entre pantallas (Inicio / Historial / Recargar)
+    // ---------------------------------------------------------------
+    function cambiarPantalla(nombre) {
+        ['Inicio', 'Historial', 'Recargar'].forEach(p => {
+            document.getElementById('pantalla' + p).classList.toggle('activa', p === nombre);
+            document.getElementById('nav' + p).classList.toggle('activo', p === nombre);
+        });
+        if (nombre === 'Historial') cargarHistorial();
+    }
+
+    // ---------------------------------------------------------------
+    // Sorteos abiertos
+    // ---------------------------------------------------------------
+    async function cargarSorteos() {
+        const data = await api('/api/sorteos');
+        const cont = document.getElementById('listaSorteos');
+        if (!data.ok || data.sorteos.length === 0) {
+            cont.innerHTML = '<div class="vacio">No hay sorteos abiertos en este momento</div>';
+            return;
+        }
+        sorteosCache = data.sorteos;
+        cont.innerHTML = data.sorteos.map(s => `
+            <div class="tarjeta sorteo-tarjeta" onclick="abrirModalCompra(${s.id})">
+                <div>
+                    <div class="sorteo-nombre">${s.nombre}</div>
+                    <div class="sorteo-hora">Cierra a las ${s.hora_cierre}</div>
+                </div>
+                <div class="sorteo-multiplicador num">x${s.multiplicador_pago}</div>
+            </div>
+        `).join('');
+    }
+
+    // ---------------------------------------------------------------
+    // Modal de compra
+    // ---------------------------------------------------------------
+    function abrirModalCompra(sorteoId) {
+        sorteoSeleccionado = sorteosCache.find(s => s.id === sorteoId);
+        if (!sorteoSeleccionado) return;
+        document.getElementById('modalSorteoNombre').textContent = sorteoSeleccionado.nombre;
+        document.getElementById('modalSorteoInfo').textContent = `Paga x${sorteoSeleccionado.multiplicador_pago} tu apuesta`;
+        document.getElementById('compraNumero').value = '';
+        document.getElementById('compraMonto').value = '';
+        document.getElementById('mensajeCompra').innerHTML = '';
+        document.getElementById('fondoModalCompra').classList.add('visible');
+    }
+
+    function cerrarModalCompra() {
+        document.getElementById('fondoModalCompra').classList.remove('visible');
+    }
+
+    async function confirmarCompra() {
+        const numero = document.getElementById('compraNumero').value.trim();
+        const monto = parseFloat(document.getElementById('compraMonto').value);
+        const msj = document.getElementById('mensajeCompra');
+
+        if (!numero || !monto || monto <= 0) {
+            msj.innerHTML = '<div class="mensaje error">Escribe un número y un monto válidos</div>';
+            return;
+        }
+
+        document.getElementById('btnConfirmarCompra').disabled = true;
+        const data = await api('/api/comprar', {
+            method: 'POST',
+            body: JSON.stringify({ sorteoId: sorteoSeleccionado.id, numero, monto })
+        });
+        document.getElementById('btnConfirmarCompra').disabled = false;
+
+        if (!data.ok) {
+            msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
+            return;
+        }
+
+        document.getElementById('saldoMonto').textContent = num(data.saldo);
+        msj.innerHTML = '<div class="mensaje exito">¡Número jugado con éxito!</div>';
+        setTimeout(cerrarModalCompra, 900);
+    }
+
+    // ---------------------------------------------------------------
+    // Historial (a partir del saldo — de momento solo lectura simple)
+    // ---------------------------------------------------------------
+    async function cargarHistorial() {
+        const cont = document.getElementById('listaHistorial');
+        cont.innerHTML = '<div class="vacio">El historial detallado se agrega en la siguiente ronda.</div>';
+        // Nota: falta un endpoint GET /api/clientes/historial en el Worker
+        // que devuelva movimientos_saldo del cliente para listar aquí.
+    }
+
+    // ---------------------------------------------------------------
+    // Recargar por comprobante
+    // ---------------------------------------------------------------
+    async function enviarComprobante() {
+        const monto = parseFloat(document.getElementById('recargaMonto').value);
+        const comprobanteUrl = document.getElementById('recargaComprobante').value.trim();
+        const msj = document.getElementById('mensajeRecarga');
+
+        if (!monto || monto <= 0 || !comprobanteUrl) {
+            msj.innerHTML = '<div class="mensaje error">Completa el monto y el enlace del comprobante</div>';
+            return;
+        }
+
+        const data = await api('/api/recargas/comprobante', {
+            method: 'POST',
+            body: JSON.stringify({ monto, comprobanteUrl })
+        });
+
+        if (!data.ok) {
+            msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
+            return;
+        }
+        msj.innerHTML = `<div class="mensaje exito">${data.mensaje}</div>`;
+        document.getElementById('recargaMonto').value = '';
+        document.getElementById('recargaComprobante').value = '';
+    }
+
+    // ---------------------------------------------------------------
+    // Arranque: si ya hay token guardado, entra directo
+    // ---------------------------------------------------------------
+    if (token) {
+        entrarAlApp();
+    }
+</script>
+</body>
+</html>
