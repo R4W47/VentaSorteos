@@ -1,0 +1,12 @@
+name = "ventas-clientes-panel-web"
+compatibility_date = "2026-09-02"
+
+# Activa explícitamente la URL pública *.workers.dev.
+# Sin esto, un sitio estático detectado automáticamente por Cloudflare
+# no la activa por defecto.
+workers_dev = true
+
+# Sirve todos los archivos que están en la raíz del repositorio
+# (donde está tu index.html) como sitio estático.
+[assets]
+directory = "./"
