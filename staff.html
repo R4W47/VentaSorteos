@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Staff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --navy: #1B2A4A;
+        --navy-soft: #2A3D63;
+        --gold: #C89B4C;
+        --paper: #FAF7F1;
+        --card: #FFFFFF;
+        --ink: #2A2E35;
+        --ink-soft: #6B7078;
+        --success: #3F8F5F;
+        --error: #C1443C;
+        --border: #E7E1D6;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',sans-serif; background:var(--paper); color:var(--ink); }
+    .num { font-family:'Fraunces', serif; }
+
+    /* ---- Acceso ---- */
+    #pantallaAcceso {
+        min-height:100vh; display:flex; flex-direction:column;
+        justify-content:center; align-items:center; padding:24px; background:var(--navy);
+    }
+    .marca { color:var(--gold); font-family:'Fraunces',serif; font-size:2em; font-weight:700; margin-bottom:6px; }
+    .marca-sub { color:#C7CEDD; font-size:0.9em; margin-bottom:28px; }
+    .tarjeta-acceso { background:var(--card); border-radius:16px; padding:28px 24px; width:100%; max-width:380px; box-shadow:0 12px 32px rgba(0,0,0,0.25); }
+    .campo { margin-bottom:14px; }
+    .campo label { display:block; font-size:0.82em; font-weight:600; color:var(--ink-soft); margin-bottom:6px; }
+    .campo input, .campo select {
+        width:100%; padding:11px 13px; border:1.5px solid var(--border); border-radius:8px; font-size:15px; font-family:inherit; background:white;
+    }
+    .campo input:focus, .campo select:focus { outline:none; border-color:var(--navy); }
+    .boton {
+        padding:12px 18px; border:none; border-radius:8px; font-size:14px; font-weight:600;
+        font-family:inherit; cursor:pointer; background:var(--navy); color:white;
+    }
+    .boton:disabled { opacity:0.5; cursor:not-allowed; }
+    .boton-oro { background:var(--gold); color:var(--navy); }
+    .boton-linea { background:transparent; border:1.5px solid var(--navy); color:var(--navy); }
+    .boton-full { width:100%; }
+    .mensaje { font-size:0.85em; padding:10px 12px; border-radius:8px; margin-bottom:14px; }
+    .mensaje.error { background:#FBEAE8; color:var(--error); }
+    .mensaje.exito { background:#E7F3EC; color:var(--success); }
+
+    /* ---- App ---- */
+    #app { display:none; }
+    header.principal {
+        background:var(--navy); padding:20px; display:flex; justify-content:space-between; align-items:center;
+    }
+    .marca-chica { color:var(--gold); font-family:'Fraunces',serif; font-weight:700; font-size:1.2em; }
+    .rol-badge { color:#C7CEDD; font-size:0.78em; }
+    .btn-salir { background:rgba(255,255,255,0.12); color:white; border:none; border-radius:6px; padding:6px 12px; font-size:0.8em; cursor:pointer; }
+
+    nav.tabs {
+        display:flex; overflow-x:auto; background:var(--card); border-bottom:1px solid var(--border);
+        position:sticky; top:0; z-index:10;
+    }
+    nav.tabs button {
+        flex:none; padding:14px 16px; background:none; border:none; font-family:inherit;
+        font-size:0.85em; font-weight:600; color:var(--ink-soft); cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;
+    }
+    nav.tabs button.activo { color:var(--navy); border-bottom-color:var(--gold); }
+
+    .contenido { max-width:640px; margin:0 auto; padding:20px 16px 60px; }
+    .tarjeta { background:var(--card); border-radius:14px; padding:18px; margin-bottom:16px; box-shadow:0 4px 14px rgba(27,42,74,0.08); }
+    .tarjeta h3 { font-size:0.95em; margin-bottom:14px; color:var(--navy); }
+    .fila { display:flex; gap:10px; }
+    .fila .campo { flex:1; }
+    .vacio { text-align:center; color:var(--ink-soft); padding:20px 10px; font-size:0.88em; }
+
+    table { width:100%; border-collapse:collapse; font-size:0.85em; }
+    th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--border); }
+    th { color:var(--ink-soft); font-weight:600; font-size:0.85em; }
+    .accion-link { color:var(--navy); font-weight:600; cursor:pointer; text-decoration:underline; font-size:0.85em; }
+    .etiqueta { display:inline-block; padding:2px 8px; border-radius:20px; font-size:0.75em; font-weight:600; }
+    .etiqueta.abierto { background:#E7F3EC; color:var(--success); }
+    .etiqueta.cerrado { background:#FBF3E4; color:var(--gold); }
+    .etiqueta.pagado { background:#EAEAEA; color:var(--ink-soft); }
+
+    .pantalla { display:none; }
+    .pantalla.activa { display:block; }
+    .cliente-info { background:#F3EEE3; border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:0.9em; }
+    .cliente-info .num { font-size:1.3em; }
+</style>
+</head>
+<body>
+
+<!-- ==================== ACCESO ==================== -->
+<div id="pantallaAcceso">
+    <div class="marca">Panel de Staff</div>
+    <div class="marca-sub">Gestión de clientes, saldo y sorteos</div>
+    <div class="tarjeta-acceso">
+        <div id="mensajeAcceso"></div>
+        <div class="campo">
+            <label>Usuario</label>
+            <input type="text" id="loginUsuario" autocomplete="username">
+        </div>
+        <div class="campo">
+            <label>Contraseña</label>
+            <input type="password" id="loginPassword" autocomplete="current-password">
+        </div>
+        <button class="boton boton-full" id="btnLogin" onclick="iniciarSesion()">Entrar</button>
+    </div>
+</div>
+
+<!-- ==================== APP ==================== -->
+<div id="app">
+    <header class="principal">
+        <div>
+            <div class="marca-chica">Panel de Staff</div>
+            <div class="rol-badge" id="rolBadge"></div>
+        </div>
+        <button class="btn-salir" onclick="cerrarSesion()">Salir</button>
+    </header>
+
+    <nav class="tabs" id="tabsNav"></nav>
+
+    <div class="contenido">
+
+        <!-- ---- Clientes ---- -->
+        <div class="pantalla" id="pantallaClientes">
+            <div class="tarjeta">
+                <h3>Crear cliente</h3>
+                <div id="mensajeCrearCliente"></div>
+                <div class="fila">
+                    <div class="campo"><label>Nombre completo</label><input type="text" id="ccNombre"></div>
+                    <div class="campo"><label>Usuario</label><input type="text" id="ccUsuario"></div>
+                </div>
+                <div class="fila">
+                    <div class="campo"><label>Contraseña</label><input type="password" id="ccPassword"></div>
+                    <div class="campo"><label>Teléfono (opcional)</label><input type="text" id="ccTelefono"></div>
+                </div>
+                <button class="boton boton-oro boton-full" onclick="crearCliente()">Crear cliente</button>
+            </div>
+        </div>
+
+        <!-- ---- Saldo (recargar / retirar) ---- -->
+        <div class="pantalla" id="pantallaSaldo">
+            <div class="tarjeta">
+                <h3>Buscar cliente</h3>
+                <div id="mensajeBuscar"></div>
+                <div class="fila">
+                    <div class="campo"><label>Usuario del cliente</label><input type="text" id="buscarUsuario"></div>
+                    <button class="boton" style="align-self:flex-end; height:44px;" onclick="buscarCliente()">Buscar</button>
+                </div>
+                <div id="clienteEncontrado"></div>
+            </div>
+        </div>
+
+        <!-- ---- Recargas pendientes ---- -->
+        <div class="pantalla" id="pantallaPendientes">
+            <div class="tarjeta">
+                <h3>Recargas pendientes de aprobar</h3>
+                <div id="listaPendientes"><div class="vacio">Cargando...</div></div>
+            </div>
+        </div>
+
+        <!-- ---- Sorteos ---- -->
+        <div class="pantalla" id="pantallaSorteos">
+            <div class="tarjeta">
+                <h3>Crear banca</h3>
+                <div id="mensajeBanca"></div>
+                <div class="fila">
+                    <div class="campo"><label>Nombre de la banca</label><input type="text" id="bancaNombre"></div>
+                    <div class="campo"><label>% Comisión pagar</label><input type="number" id="bancaPagar" value="0"></div>
+                    <div class="campo"><label>% Comisión recibir</label><input type="number" id="bancaRecibir" value="0"></div>
+                </div>
+                <button class="boton boton-full" onclick="crearBanca()">Crear banca</button>
+            </div>
+
+            <div class="tarjeta">
+                <h3>Crear sorteo</h3>
+                <div id="mensajeSorteo"></div>
+                <div class="fila">
+                    <div class="campo"><label>Nombre</label><input type="text" id="sNombre" placeholder="Diaria 11am"></div>
+                    <div class="campo"><label>Banca</label><select id="sBanca"></select></div>
+                </div>
+                <div class="fila">
+                    <div class="campo"><label>Fecha</label><input type="date" id="sFecha"></div>
+                    <div class="campo"><label>Hora de cierre</label><input type="time" id="sHoraCierre"></div>
+                    <div class="campo"><label>Multiplicador de pago</label><input type="number" id="sMultiplicador" value="70"></div>
+                </div>
+                <div class="fila">
+                    <div class="campo">
+                        <label>Tipo de límite por número</label>
+                        <select id="sTipoLimite" onchange="actualizarCamposLimite()">
+                            <option value="ninguno">Ninguno</option>
+                            <option value="monto">Monto fijo</option>
+                            <option value="porcentaje">Porcentaje</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="fila" id="camposLimiteMonto" style="display:none;">
+                    <div class="campo"><label>Monto máximo por número (C$)</label><input type="number" id="sMontoMaximo"></div>
+                </div>
+                <div class="fila" id="camposLimitePorcentaje" style="display:none;">
+                    <div class="campo"><label>% máximo del total del sorteo</label><input type="number" id="sPorcentajeMaximo"></div>
+                    <div class="campo"><label>Piso garantizado por número (C$)</label><input type="number" id="sMontoMinimo" value="0"></div>
+                </div>
+                <button class="boton boton-oro boton-full" onclick="crearSorteo()">Crear sorteo</button>
+            </div>
+
+            <div class="tarjeta">
+                <h3>Sorteos</h3>
+                <div id="listaSorteosStaff"><div class="vacio">Cargando...</div></div>
+            </div>
+        </div>
+
+        <!-- ---- Staff ---- -->
+        <div class="pantalla" id="pantallaStaff">
+            <div class="tarjeta">
+                <h3>Crear cuenta de staff</h3>
+                <div id="mensajeCrearStaff"></div>
+                <div class="fila">
+                    <div class="campo"><label>Nombre completo</label><input type="text" id="stNombre"></div>
+                    <div class="campo"><label>Usuario</label><input type="text" id="stUsuario"></div>
+                </div>
+                <div class="fila">
+                    <div class="campo"><label>Contraseña</label><input type="password" id="stPassword"></div>
+                    <div class="campo">
+                        <label>Rol</label>
+                        <select id="stRol">
+                            <option value="cajero">Cajero</option>
+                            <option value="supervisor">Supervisor</option>
+                            <option value="vendedor">Vendedor</option>
+                            <option value="administrador">Administrador</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="fila">
+                    <div class="campo"><label>Salario base (C$)</label><input type="number" id="stSalario" value="0"></div>
+                    <div class="campo"><label>% comisión sobre ingresos (opcional)</label><input type="number" id="stComision"></div>
+                </div>
+                <button class="boton boton-oro boton-full" onclick="crearStaff()">Crear cuenta</button>
+            </div>
+
+            <div class="tarjeta">
+                <h3>Staff existente y permisos</h3>
+                <div id="listaStaff"><div class="vacio">Cargando...</div></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // =====================================================================
+    // CONFIGURACIÓN — reemplaza esto por la URL real de tu Worker desplegado
+    // =====================================================================
+    const WORKER_URL = 'https://TU-WORKER.workers.dev';
+
+    let token = localStorage.getItem('token_staff') || null;
+    let misPermisos = [];
+    let miRol = null;
+    let clienteActual = null;
+    let bancasCache = [];
+    let permisosCatalogo = [];
+
+    // Secciones del panel: clave, etiqueta, y qué permiso hace falta
+    // (null = disponible para cualquier staff logueado)
+    const SECCIONES = [
+        { id: 'Clientes',   etiqueta: 'Clientes',    permiso: null },
+        { id: 'Saldo',      etiqueta: 'Saldo',       permiso: null },
+        { id: 'Pendientes', etiqueta: 'Recargas pendientes', permiso: 'aprobar_recargas' },
+        { id: 'Sorteos',    etiqueta: 'Sorteos',     permiso: 'gestionar_sorteos' },
+        { id: 'Staff',      etiqueta: 'Staff',       permiso: 'gestionar_staff' }
+    ];
+
+    async function api(ruta, opciones = {}) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const resp = await fetch(WORKER_URL + ruta, { ...opciones, headers });
+        return resp.json();
+    }
+
+    function num(n) {
+        return (n || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 });
+    }
+
+    // ---------------------------------------------------------------
+    // Acceso
+    // ---------------------------------------------------------------
+    async function iniciarSesion() {
+        const usuario = document.getElementById('loginUsuario').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const msj = document.getElementById('mensajeAcceso');
+        if (!usuario || !password) {
+            msj.innerHTML = '<div class="mensaje error">Completa usuario y contraseña</div>';
+            return;
+        }
+        document.getElementById('btnLogin').disabled = true;
+        const data = await api('/api/staff/login', { method: 'POST', body: JSON.stringify({ usuario, password }) });
+        document.getElementById('btnLogin').disabled = false;
+        if (!data.ok) {
+            msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
+            return;
+        }
+        token = data.token;
+        localStorage.setItem('token_staff', token);
+        await entrarAlApp(data.nombre, data.rol);
+    }
+
+    function cerrarSesion() {
+        localStorage.removeItem('token_staff');
+        token = null;
+        document.getElementById('app').style.display = 'none';
+        document.getElementById('pantallaAcceso').style.display = 'flex';
+    }
+
+    async function entrarAlApp(nombre, rol) {
+        document.getElementById('pantallaAcceso').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('rolBadge').textContent = `${nombre || ''} · ${rol || ''}`;
+        miRol = rol;
+
+        const permData = await api('/api/staff/permisos');
+        misPermisos = permData.ok ? permData.permisos : [];
+
+        construirTabs();
+        cambiarPantalla(SECCIONES.find(s => tieneAcceso(s)).id);
+    }
+
+    function tieneAcceso(seccion) {
+        return seccion.permiso === null || misPermisos.includes(seccion.permiso);
+    }
+
+    function construirTabs() {
+        const nav = document.getElementById('tabsNav');
+        nav.innerHTML = SECCIONES.filter(tieneAcceso).map(s =>
+            `<button id="tab${s.id}" onclick="cambiarPantalla('${s.id}')">${s.etiqueta}</button>`
+        ).join('');
+    }
+
+    function cambiarPantalla(id) {
+        SECCIONES.forEach(s => {
+            const pantalla = document.getElementById('pantalla' + s.id);
+            const tab = document.getElementById('tab' + s.id);
+            if (pantalla) pantalla.classList.toggle('activa', s.id === id);
+            if (tab) tab.classList.toggle('activo', s.id === id);
+        });
+        if (id === 'Pendientes') cargarPendientes();
+        if (id === 'Sorteos') { cargarBancasSelect(); cargarSorteosStaff(); }
+        if (id === 'Staff') { cargarStaff(); cargarPermisosCatalogo(); }
+    }
+
+    // ---------------------------------------------------------------
+    // Clientes: crear
+    // ---------------------------------------------------------------
+    async function crearCliente() {
+        const nombre = document.getElementById('ccNombre').value.trim();
+        const usuario = document.getElementById('ccUsuario').value.trim();
+        const password = document.getElementById('ccPassword').value;
+        const telefono = document.getElementById('ccTelefono').value.trim();
+        const msj = document.getElementById('mensajeCrearCliente');
+
+        if (!nombre || !usuario || !password) {
+            msj.innerHTML = '<div class="mensaje error">Completa nombre, usuario y contraseña</div>';
+            return;
+        }
+        const data = await api('/api/clientes', {
+            method: 'POST',
+            body: JSON.stringify({ nombre, usuario, password, telefono })
+        });
+        if (!data.ok) {
+            msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
+            return;
+        }
+        msj.innerHTML = '<div class="mensaje exito">Cliente creado correctamente</div>';
+        document.getElementById('ccNombre').value = '';
+        document.getElementById('ccUsuario').value = '';
+        document.getElementById('ccPassword').value = '';
+        document.getElementById('ccTelefono').value = '';
+    }
+
+    // ---------------------------------------------------------------
+    // Saldo: buscar cliente + recargar/retirar
+    // ---------------------------------------------------------------
+    async function buscarCliente() {
+        const usuario = document.getElementById('buscarUsuario').value.trim();
+        const msj = document.getElementById('mensajeBuscar');
+        const cont = document.getElementById('clienteEncontrado');
+        if (!usuario) return;
+
+        const data = await api('/api/clientes/buscar?usuario=' + encodeURIComponent(usuario));
+        if (!data.ok) {
+            msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
+            cont.innerHTML = '';
+            return;
+        }
+        msj.innerHTML = '';
+        clienteActual = data.cliente;
+
+        const puedeRecargar = misPermisos.includes('recargar_saldo');
+        const puedeRetirar = misPermisos.includes('retirar_saldo');
+
+        cont.innerHTML = `
+            <div class="cliente-info">
+                <div><strong>${clienteActual.nombre}</strong> (@${clienteActual.usuario})</div>
+                <div>Saldo actual: <span class="num">C$${num(clienteActual.saldo)}</span></div>
+            </div>
+            <div id="mensajeMovimiento"></div>
+            ${(puedeRecargar || puedeRetirar) ? `
+                <div class="fila">
+                    <div class="campo"><label>Monto (C$)</label><input type="number" id="movimientoMonto" min="1"></div>
+                </div>
+                <div class="fila">
+                    ${puedeRecargar ? '<button class="boton boton-oro" onclick="recargarEfectivo()">Recargar en efectivo</button>' : ''}
+                    ${puedeRetirar ? '<button class="boton boton-linea" onclick="retirarEfectivo()">Retirar / pagar premio</button>' : ''}
+                </div>
+            ` : '<div class="vacio">No tienes permiso para recargar ni retirar saldo</div>'}
+        `;
+    }
+
+    async function recargarEfectivo() {
+        const monto = parseFloat(document.getElementById('movimientoMonto').value);
+        const msj = document.getElementById('mensajeMovimiento');
+        if (!monto || monto <= 0) { msj.innerHTML = '<div class="mensaje error">Ingresa un monto válido</div>'; return; }
+
+        const data = await api('/api/recargas/efectivo', {
+            method: 'POST',
+            body: JSON.stringify({ clienteId: clienteActual.id, monto })
+        });
+        if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
+        msj.innerHTML = `<div class="mensaje exito">Recarga aplicada. Nuevo saldo: C$${num(data.saldo)}</div>`;
+        clienteActual.saldo = data.saldo;
+    }
+
+    async function retirarEfectivo() {
+        const monto = parseFloat(document.getElementById('movimientoMonto').value);
+        const msj = document.getElementById('mensajeMovimiento');
+        if (!monto || monto <= 0) { msj.innerHTML = '<div class="mensaje error">Ingresa un monto válido</div>'; return; }
+
+        const data = await api('/api/retiros', {
+            method: 'POST',
+            body: JSON.stringify({ clienteId: clienteActual.id, monto })
+        });
+        if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
+        msj.innerHTML = `<div class="mensaje exito">Retiro aplicado. Nuevo saldo: C$${num(data.saldo)}</div>`;
+        clienteActual.saldo = data.saldo;
+    }
+
+    // ---------------------------------------------------------------
+    // Recargas pendientes de comprobante
+    // ---------------------------------------------------------------
+    async function cargarPendientes() {
+        const cont = document.getElementById('listaPendientes');
+        const data = await api('/api/recargas/pendientes');
+        if (!data.ok || data.recargas.length === 0) {
+            cont.innerHTML = '<div class="vacio">No hay recargas pendientes</div>';
+            return;
+        }
+        cont.innerHTML = `
+            <table><thead><tr><th>Cliente</th><th>Monto</th><th>Comprobante</th><th></th></tr></thead><tbody>
+            ${data.recargas.map(r => `
+                <tr>
+                    <td>${r.cliente_nombre}</td>
+                    <td class="num">C$${num(r.monto)}</td>
+                    <td><a href="${r.comprobante_url}" target="_blank">Ver</a></td>
+                    <td><span class="accion-link" onclick="aprobarRecarga(${r.id})">Aprobar</span></td>
+                </tr>
+            `).join('')}
+            </tbody></table>
+        `;
+    }
+
+    async function aprobarRecarga(id) {
+        const data = await api(`/api/recargas/${id}/aprobar`, { method: 'POST' });
+        if (data.ok) cargarPendientes();
+    }
+
+    // ---------------------------------------------------------------
+    // Sorteos: bancas, crear sorteo, listar
+    // ---------------------------------------------------------------
+    function actualizarCamposLimite() {
+        const tipo = document.getElementById('sTipoLimite').value;
+        document.getElementById('camposLimiteMonto').style.display = tipo === 'monto' ? 'flex' : 'none';
+        document.getElementById('camposLimitePorcentaje').style.display = tipo === 'porcentaje' ? 'flex' : 'none';
+    }
+
+    async function crearBanca() {
+        const nombre = document.getElementById('bancaNombre').value.trim();
+        const comisionPagarPct = parseFloat(document.getElementById('bancaPagar').value) || 0;
+        const comisionRecibirPct = parseFloat(document.getElementById('bancaRecibir').value) || 0;
+        const msj = document.getElementById('mensajeBanca');
+        if (!nombre) { msj.innerHTML = '<div class="mensaje error">Ingresa el nombre de la banca</div>'; return; }
+
+        const data = await api('/api/bancas', {
+            method: 'POST',
+            body: JSON.stringify({ nombre, comisionPagarPct, comisionRecibirPct })
+        });
+        if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
+        msj.innerHTML = '<div class="mensaje exito">Banca creada</div>';
+        document.getElementById('bancaNombre').value = '';
+        cargarBancasSelect();
+    }
+
+    async function cargarBancasSelect() {
+        const data = await api('/api/bancas');
+        if (!data.ok) return;
+        bancasCache = data.bancas;
+        document.getElementById('sBanca').innerHTML = bancasCache.map(b =>
+            `<option value="${b.id}">${b.nombre}</option>`
+        ).join('') || '<option value="">Sin bancas creadas</option>';
+    }
+
+    async function crearSorteo() {
+        const msj = document.getElementById('mensajeSorteo');
+        const nombre = document.getElementById('sNombre').value.trim();
+        const fecha = document.getElementById('sFecha').value;
+        const horaCierre = document.getElementById('sHoraCierre').value;
+        const bancaId = document.getElementById('sBanca').value;
+        const multiplicadorPago = parseFloat(document.getElementById('sMultiplicador').value) || 0;
+        const tipoLimiteDefault = document.getElementById('sTipoLimite').value;
+        const montoMaximoDefault = parseFloat(document.getElementById('sMontoMaximo').value) || null;
+        const porcentajeMaximoDefault = parseFloat(document.getElementById('sPorcentajeMaximo').value) || null;
+        const montoMinimoGarantizadoDefault = parseFloat(document.getElementById('sMontoMinimo').value) || 0;
+
+        if (!nombre || !fecha || !horaCierre) {
+            msj.innerHTML = '<div class="mensaje error">Completa nombre, fecha y hora de cierre</div>';
+            return;
+        }
+
+        const data = await api('/api/sorteos', {
+            method: 'POST',
+            body: JSON.stringify({
+                nombre, fecha, horaCierre, bancaId, multiplicadorPago,
+                tipoLimiteDefault, montoMaximoDefault, porcentajeMaximoDefault, montoMinimoGarantizadoDefault
+            })
+        });
+        if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
+        msj.innerHTML = '<div class="mensaje exito">Sorteo creado</div>';
+        document.getElementById('sNombre').value = '';
+        cargarSorteosStaff();
+    }
+
+    async function cargarSorteosStaff() {
+        const cont = document.getElementById('listaSorteosStaff');
+        const data = await api('/api/sorteos');
+        if (!data.ok || data.sorteos.length === 0) {
+            cont.innerHTML = '<div class="vacio">No hay sorteos creados</div>';
+            return;
+        }
+        cont.innerHTML = `
+            <table><thead><tr><th>Sorteo</th><th>Estado</th><th></th></tr></thead><tbody>
+            ${data.sorteos.map(s => `
+                <tr>
+                    <td>${s.nombre}<br><span style="color:var(--ink-soft); font-size:0.8em;">${s.fecha} · ${s.hora_cierre}</span></td>
+                    <td><span class="etiqueta ${s.estado}">${s.estado}</span></td>
+                    <td>
+                        ${s.estado === 'abierto' && misPermisos.includes('gestionar_sorteos')
+                            ? `<span class="accion-link" onclick="cerrarSorteo(${s.id})">Cerrar</span>` : ''}
+                        ${s.estado === 'cerrado' && misPermisos.includes('registrar_resultado')
+                            ? `<span class="accion-link" onclick="registrarResultado(${s.id})">Resultado</span>` : ''}
+                    </td>
+                </tr>
+            `).join('')}
+            </tbody></table>
+        `;
+    }
+
+    async function cerrarSorteo(id) {
+        const data = await api(`/api/sorteos/${id}/cerrar`, { method: 'POST' });
+        if (data.ok) cargarSorteosStaff();
+    }
+
+    async function registrarResultado(id) {
+        const numeroGanador = prompt('¿Cuál fue el número ganador?');
+        if (!numeroGanador) return;
+        const data = await api(`/api/sorteos/${id}/resultado`, {
+            method: 'POST',
+            body: JSON.stringify({ numeroGanador: numeroGanador.trim() })
+        });
+        if (data.ok) {
+            alert(`Premios pagados a ${data.ganadores} cliente(s). Total: C$${num(data.totalPagado)}`);
+            cargarSorteosStaff();
+        } else {
+            alert(data.error);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Staff: crear, listar, permisos
+    // ---------------------------------------------------------------
+    async function crearStaff() {
+        const msj = document.getElementById('mensajeCrearStaff');
+        const nombre = document.getElementById('stNombre').value.trim();
+        const usuario = document.getElementById('stUsuario').value.trim();
+        const password = document.getElementById('stPassword').value;
+        const rol = document.getElementById('stRol').value;
+        const salarioBase = parseFloat(document.getElementById('stSalario').value) || 0;
+        const comisionIngresosPct = document.getElementById('stComision').value
+            ? parseFloat(document.getElementById('stComision').value) : null;
+
+        if (!nombre || !usuario || !password) {
+            msj.innerHTML = '<div class="mensaje error">Completa nombre, usuario y contraseña</div>';
+            return;
+        }
+
+        const data = await api('/api/staff', {
+            method: 'POST',
+            body: JSON.stringify({ nombre, usuario, password, rol, salarioBase, comisionIngresosPct })
+        });
+        if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
+        msj.innerHTML = '<div class="mensaje exito">Cuenta de staff creada</div>';
+        document.getElementById('stNombre').value = '';
+        document.getElementById('stUsuario').value = '';
+        document.getElementById('stPassword').value = '';
+        cargarStaff();
+    }
+
+    async function cargarPermisosCatalogo() {
+        const data = await api('/api/permisos');
+        if (data.ok) permisosCatalogo = data.permisos;
+    }
+
+    async function cargarStaff() {
+        const cont = document.getElementById('listaStaff');
+        const data = await api('/api/staff');
+        if (!data.ok || data.staff.length === 0) {
+            cont.innerHTML = '<div class="vacio">No hay staff registrado</div>';
+            return;
+        }
+        cont.innerHTML = data.staff.map(s => `
+            <div style="border-bottom:1px solid var(--border); padding:10px 0;">
+                <strong>${s.nombre}</strong> (@${s.usuario}) — ${s.rol}
+                <div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
+                    <select id="permisoSel${s.id}" style="font-size:0.8em; padding:4px;">
+                        ${permisosCatalogo.map(p => `<option value="${p.clave}">${p.clave}</option>`).join('')}
+                    </select>
+                    <span class="accion-link" onclick="darPermiso(${s.id}, true)">Otorgar</span>
+                    <span class="accion-link" onclick="darPermiso(${s.id}, false)">Revocar</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function darPermiso(staffId, concedido) {
+        const permisoClave = document.getElementById('permisoSel' + staffId).value;
+        await api(`/api/staff/${staffId}/permisos`, {
+            method: 'POST',
+            body: JSON.stringify({ permisoClave, concedido })
+        });
+        alert(concedido ? 'Permiso otorgado' : 'Permiso revocado');
+    }
+
+    // ---------------------------------------------------------------
+    // Arranque
+    // ---------------------------------------------------------------
+    if (token) {
+        api('/api/staff/permisos').then(data => {
+            if (data.ok) entrarAlApp('', data.rol);
+            else cerrarSesion();
+        });
+    }
+</script>
+</body>
+</html>
