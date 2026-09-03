@@ -316,10 +316,43 @@
 
     <div class="contenido">
 
-        <!-- ---- Pantalla: Inicio (sorteos) ---- -->
+        <!-- ---- Pantalla: Inicio (armar la colilla de números) ---- -->
         <div class="pantalla activa" id="pantallaInicio">
-            <div class="seccion-titulo">Sorteos abiertos</div>
-            <div id="listaSorteos"><div class="vacio">Cargando sorteos...</div></div>
+            <div class="tarjeta">
+                <div class="campo">
+                    <label>Sorteo</label>
+                    <select id="selectSorteo"></select>
+                </div>
+            </div>
+
+            <div class="tarjeta">
+                <div id="mensajeColilla"></div>
+                <div class="fila">
+                    <div class="campo">
+                        <label>Número</label>
+                        <input type="text" id="colNumero" maxlength="2" inputmode="numeric" placeholder="00">
+                    </div>
+                    <div class="campo">
+                        <label>Monto (C$)</label>
+                        <input type="number" id="colMonto" min="1">
+                    </div>
+                </div>
+                <label style="display:flex; align-items:center; gap:6px; font-size:0.85em; color:var(--ink-soft); margin-bottom:12px;">
+                    <input type="checkbox" id="colRepetirMonto" style="width:auto;">
+                    Repetir este monto en el siguiente número
+                </label>
+                <button class="boton boton-full" onclick="agregarAColilla()">+ Agregar a la jugada</button>
+            </div>
+
+            <div class="tarjeta" id="tarjetaColilla" style="display:none;">
+                <h3 style="font-family:'Fraunces',serif; margin-bottom:10px;">Tu jugada</h3>
+                <div id="listaColilla"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin:14px 0; font-weight:600;">
+                    <span>Total</span>
+                    <span class="num" style="font-size:1.4em;">C$<span id="totalColilla">0.00</span></span>
+                </div>
+                <button class="boton boton-oro boton-full" id="btnComprarLote" onclick="confirmarCompraLote()">Comprar jugada</button>
+            </div>
         </div>
 
         <!-- ---- Pantalla: Historial ---- -->
@@ -360,32 +393,11 @@
     </nav>
 </div>
 
-<!-- ==================== MODAL: COMPRAR NÚMERO ==================== -->
-<div class="fondo-modal" id="fondoModalCompra">
-    <div class="hoja-modal">
-        <h3 id="modalSorteoNombre">Sorteo</h3>
-        <div class="sub" id="modalSorteoInfo">Paga x0 tu apuesta</div>
-        <div id="mensajeCompra"></div>
-        <div class="campo campo-numero-grande">
-            <label>Número</label>
-            <input type="text" id="compraNumero" maxlength="2" inputmode="numeric" placeholder="00">
-        </div>
-        <div class="campo">
-            <label>Monto a jugar (C$)</label>
-            <input type="number" id="compraMonto" min="1">
-        </div>
-        <div class="fila-botones">
-            <button class="boton boton-linea" onclick="cerrarModalCompra()">Cancelar</button>
-            <button class="boton boton-oro" id="btnConfirmarCompra" onclick="confirmarCompra()">Jugar número</button>
-        </div>
-    </div>
-</div>
-
 <script>
     // =====================================================================
     // CONFIGURACIÓN — reemplaza esto por la URL real de tu Worker desplegado
     // =====================================================================
-    const WORKER_URL = 'https://ventas-clientes-worker.watsonmraul.workers.dev';
+    const WORKER_URL = 'https://TU-WORKER.workers.dev';
 
     let token = localStorage.getItem('token_cliente') || null;
     let sorteoSeleccionado = null;
@@ -468,61 +480,111 @@
     }
 
     // ---------------------------------------------------------------
-    // Sorteos abiertos
+    // Sorteos abiertos: llenar el <select>
     // ---------------------------------------------------------------
     async function cargarSorteos() {
         const data = await api('/api/sorteos');
-        const cont = document.getElementById('listaSorteos');
+        const select = document.getElementById('selectSorteo');
         if (!data.ok || data.sorteos.length === 0) {
-            cont.innerHTML = '<div class="vacio">No hay sorteos abiertos en este momento</div>';
+            select.innerHTML = '<option value="">No hay sorteos abiertos</option>';
+            sorteosCache = [];
             return;
         }
         sorteosCache = data.sorteos;
-        cont.innerHTML = data.sorteos.map(s => `
-            <div class="tarjeta sorteo-tarjeta" onclick="abrirModalCompra(${s.id})">
-                <div>
-                    <div class="sorteo-nombre">${s.nombre}</div>
-                    <div class="sorteo-hora">Cierra a las ${s.hora_cierre}</div>
-                </div>
-                <div class="sorteo-multiplicador num">x${s.multiplicador_pago}</div>
-            </div>
-        `).join('');
+        select.innerHTML = data.sorteos.map(s =>
+            `<option value="${s.id}">${s.nombre} — cierra ${s.hora_cierre} (x${s.multiplicador_pago})</option>`
+        ).join('');
     }
 
     // ---------------------------------------------------------------
-    // Modal de compra
+    // Colilla: agregar números, mostrar lista, totalizar
     // ---------------------------------------------------------------
-    function abrirModalCompra(sorteoId) {
-        sorteoSeleccionado = sorteosCache.find(s => s.id === sorteoId);
-        if (!sorteoSeleccionado) return;
-        document.getElementById('modalSorteoNombre').textContent = sorteoSeleccionado.nombre;
-        document.getElementById('modalSorteoInfo').textContent = `Paga x${sorteoSeleccionado.multiplicador_pago} tu apuesta`;
-        document.getElementById('compraNumero').value = '';
-        document.getElementById('compraMonto').value = '';
-        document.getElementById('mensajeCompra').innerHTML = '';
-        document.getElementById('fondoModalCompra').classList.add('visible');
-    }
+    let colilla = [];
 
-    function cerrarModalCompra() {
-        document.getElementById('fondoModalCompra').classList.remove('visible');
-    }
-
-    async function confirmarCompra() {
-        const numero = document.getElementById('compraNumero').value.trim();
-        const monto = parseFloat(document.getElementById('compraMonto').value);
-        const msj = document.getElementById('mensajeCompra');
+    function agregarAColilla() {
+        const numero = document.getElementById('colNumero').value.trim();
+        const monto = parseFloat(document.getElementById('colMonto').value);
+        const repetirMonto = document.getElementById('colRepetirMonto').checked;
+        const msj = document.getElementById('mensajeColilla');
 
         if (!numero || !monto || monto <= 0) {
             msj.innerHTML = '<div class="mensaje error">Escribe un número y un monto válidos</div>';
             return;
         }
 
-        document.getElementById('btnConfirmarCompra').disabled = true;
-        const data = await api('/api/comprar', {
+        colilla.push({ numero, monto });
+        msj.innerHTML = '';
+
+        // Limpiar el número siempre; el monto solo se limpia si NO se
+        // marcó "repetir este monto" (así se puede seguir agregando
+        // números distintos con el mismo monto sin retiparlo).
+        document.getElementById('colNumero').value = '';
+        if (!repetirMonto) {
+            document.getElementById('colMonto').value = '';
+        }
+        document.getElementById('colNumero').focus();
+
+        renderizarColilla();
+    }
+
+    function quitarDeColilla(indice) {
+        colilla.splice(indice, 1);
+        renderizarColilla();
+    }
+
+    function renderizarColilla() {
+        const tarjeta = document.getElementById('tarjetaColilla');
+        const lista = document.getElementById('listaColilla');
+
+        if (colilla.length === 0) {
+            tarjeta.style.display = 'none';
+            return;
+        }
+        tarjeta.style.display = 'block';
+
+        lista.innerHTML = colilla.map((item, i) => `
+            <div class="historial-fila">
+                <div><strong class="num">${item.numero}</strong></div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="num">C$${num(item.monto)}</span>
+                    <span class="accion-quitar" onclick="quitarDeColilla(${i})" style="color:var(--error); cursor:pointer; font-size:0.85em;">Quitar</span>
+                </div>
+            </div>
+        `).join('');
+
+        const total = colilla.reduce((acc, item) => acc + item.monto, 0);
+        document.getElementById('totalColilla').textContent = num(total);
+    }
+
+    // ---------------------------------------------------------------
+    // Confirmar la jugada completa (todos los números de la colilla)
+    // ---------------------------------------------------------------
+    async function confirmarCompraLote() {
+        const msj = document.getElementById('mensajeColilla');
+        const sorteoId = document.getElementById('selectSorteo').value;
+
+        if (!sorteoId) {
+            msj.innerHTML = '<div class="mensaje error">Selecciona un sorteo</div>';
+            return;
+        }
+        if (colilla.length === 0) {
+            msj.innerHTML = '<div class="mensaje error">Agrega al menos un número a la jugada</div>';
+            return;
+        }
+
+        const total = colilla.reduce((acc, item) => acc + item.monto, 0);
+        const saldoActual = parseFloat(document.getElementById('saldoMonto').textContent.replace(/,/g, ''));
+        if (total > saldoActual) {
+            msj.innerHTML = '<div class="mensaje error">El total de la jugada supera tu saldo disponible</div>';
+            return;
+        }
+
+        document.getElementById('btnComprarLote').disabled = true;
+        const data = await api('/api/comprar-lote', {
             method: 'POST',
-            body: JSON.stringify({ sorteoId: sorteoSeleccionado.id, numero, monto })
+            body: JSON.stringify({ sorteoId, items: colilla })
         });
-        document.getElementById('btnConfirmarCompra').disabled = false;
+        document.getElementById('btnComprarLote').disabled = false;
 
         if (!data.ok) {
             msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
@@ -530,8 +592,9 @@
         }
 
         document.getElementById('saldoMonto').textContent = num(data.saldo);
-        msj.innerHTML = '<div class="mensaje exito">¡Número jugado con éxito!</div>';
-        setTimeout(cerrarModalCompra, 900);
+        msj.innerHTML = '<div class="mensaje exito">¡Jugada aplicada con éxito!</div>';
+        colilla = [];
+        renderizarColilla();
     }
 
     // ---------------------------------------------------------------

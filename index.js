@@ -4,8 +4,40 @@ import { hashPassword, verifyPassword, crearToken, verificarToken, tienePermiso 
 
 export { ClienteBalance, SorteoLimites };
 
+// Cabeceras CORS: permiten que la app (en otro dominio, ej. panel-web)
+// pueda llamar a este Worker desde el navegador.
+const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+};
+
 export default {
     async fetch(request, env) {
+        // El navegador manda una solicitud OPTIONS ("preflight") antes de la
+        // real cuando hay credenciales de por medio (como Authorization).
+        // Hay que responderla con las cabeceras CORS o el navegador bloquea
+        // la solicitud real antes de que llegue a nuestras rutas.
+        if (request.method === 'OPTIONS') {
+            return new Response(null, { headers: CORS_HEADERS });
+        }
+
+        const respuesta = await manejarSolicitud(request, env);
+
+        // Se agregan las cabeceras CORS a CUALQUIER respuesta que salga de
+        // aquí, sin importar de qué ruta venga (incluyendo las que vienen
+        // directo de un Durable Object).
+        const headers = new Headers(respuesta.headers);
+        Object.entries(CORS_HEADERS).forEach(([clave, valor]) => headers.set(clave, valor));
+        return new Response(respuesta.body, {
+            status: respuesta.status,
+            statusText: respuesta.statusText,
+            headers
+        });
+    }
+};
+
+async function manejarSolicitud(request, env) {
         const url = new URL(request.url);
         const path = url.pathname;
         const method = request.method;
@@ -77,13 +109,87 @@ export default {
             }
 
             // ============================================================
+            // MIS PERMISOS (el staff logueado consulta qué puede hacer,
+            // para que el panel muestre solo las secciones permitidas)
+            // ============================================================
+            if (path === '/api/staff/permisos' && method === 'GET') {
+                if (!auth || auth.tipo !== 'staff') return noAutorizado();
+
+                const { results: porRol } = await env.DB.prepare(
+                    'SELECT permiso_clave FROM rol_permisos WHERE rol = ?'
+                ).bind(auth.rol).all();
+                const { results: overrides } = await env.DB.prepare(
+                    'SELECT permiso_clave, concedido FROM staff_permisos WHERE staff_id = ?'
+                ).bind(auth.id).all();
+
+                const permisos = new Set(porRol.map(p => p.permiso_clave));
+                overrides.forEach(o => {
+                    if (o.concedido === 1) permisos.add(o.permiso_clave);
+                    else permisos.delete(o.permiso_clave);
+                });
+
+                return Response.json({ ok: true, rol: auth.rol, permisos: [...permisos] });
+            }
+
+            // ============================================================
+            // BUSCAR CLIENTE POR USUARIO (para recargar/retirar sin saber su ID)
+            // ============================================================
+            if (path === '/api/clientes/buscar' && method === 'GET') {
+                if (!auth || auth.tipo !== 'staff') return noAutorizado();
+
+                const usuario = url.searchParams.get('usuario');
+                if (!usuario) {
+                    return Response.json({ ok: false, error: 'Falta el usuario a buscar' }, { status: 400 });
+                }
+
+                const cliente = await env.DB.prepare(
+                    'SELECT id, usuario, nombre, saldo FROM clientes WHERE usuario = ? AND activo = 1'
+                ).bind(usuario).first();
+
+                if (!cliente) {
+                    return Response.json({ ok: false, error: 'No se encontró ese cliente' }, { status: 404 });
+                }
+                return Response.json({ ok: true, cliente });
+            }
+
+            // ============================================================
+            // RECARGAS PENDIENTES DE APROBACIÓN
+            // ============================================================
+            if (path === '/api/recargas/pendientes' && method === 'GET') {
+                if (!auth || auth.tipo !== 'staff') return noAutorizado();
+                if (!(await tienePermiso(env.DB, auth.id, auth.rol, 'aprobar_recargas'))) return sinPermiso();
+
+                const { results } = await env.DB.prepare(
+                    `SELECT m.id, m.monto, m.comprobante_url, m.creado_en,
+                            c.usuario AS cliente_usuario, c.nombre AS cliente_nombre
+                     FROM movimientos_saldo m
+                     JOIN clientes c ON c.id = m.cliente_id
+                     WHERE m.tipo = 'recarga_comprobante' AND m.estado = 'pendiente'
+                     ORDER BY m.creado_en ASC`
+                ).all();
+
+                return Response.json({ ok: true, recargas: results });
+            }
+
+            // ============================================================
             // SORTEOS ABIERTOS (público para clientes logueados)
             // ============================================================
             if (path === '/api/sorteos' && method === 'GET') {
                 if (!auth) return noAutorizado();
+
+                // El cliente solo ve los abiertos; el staff con gestionar_sorteos
+                // o registrar_resultado ve todos, para poder cerrarlos y pagarlos.
+                let filtroEstado = "estado = 'abierto'";
+                if (auth.tipo === 'staff' && (
+                    await tienePermiso(env.DB, auth.id, auth.rol, 'gestionar_sorteos') ||
+                    await tienePermiso(env.DB, auth.id, auth.rol, 'registrar_resultado')
+                )) {
+                    filtroEstado = '1=1';
+                }
+
                 const { results } = await env.DB.prepare(
-                    `SELECT id, nombre, fecha, hora_cierre, multiplicador_pago
-                     FROM sorteos WHERE estado = 'abierto' ORDER BY hora_cierre ASC`
+                    `SELECT id, nombre, fecha, hora_cierre, estado, multiplicador_pago, banca_id
+                     FROM sorteos WHERE ${filtroEstado} ORDER BY fecha DESC, hora_cierre ASC`
                 ).all();
                 return Response.json({ ok: true, sorteos: results });
             }
@@ -98,6 +204,86 @@ export default {
                     method: 'POST',
                     body: JSON.stringify({ accion: 'consultar', clienteId: auth.id })
                 });
+            }
+
+            // ============================================================
+            // COMPRAR VARIOS NÚMEROS DE UNA VEZ (la "colilla" completa)
+            // Todo o nada: si un número falla a mitad de la lista, se
+            // revierten los que ya se habían aplicado.
+            // ============================================================
+            if (path === '/api/comprar-lote' && method === 'POST') {
+                if (!auth || auth.tipo !== 'cliente') return noAutorizado();
+                const { sorteoId, items } = await request.json();
+
+                if (!Array.isArray(items) || items.length === 0) {
+                    return Response.json({ ok: false, error: 'La lista de números está vacía' }, { status: 400 });
+                }
+                for (const item of items) {
+                    if (!item.numero || !item.monto || item.monto <= 0) {
+                        return Response.json({ ok: false, error: 'Hay un número o monto inválido en la lista' }, { status: 400 });
+                    }
+                }
+
+                const sorteo = await env.DB.prepare('SELECT estado FROM sorteos WHERE id = ?')
+                    .bind(sorteoId).first();
+                if (!sorteo || sorteo.estado !== 'abierto') {
+                    return Response.json({ ok: false, error: 'El sorteo ya no está abierto' }, { status: 400 });
+                }
+
+                const clienteStub = env.CLIENTE_DO.get(env.CLIENTE_DO.idFromName(String(auth.id)));
+                const sorteoStub = env.SORTEO_DO.get(env.SORTEO_DO.idFromName(String(sorteoId)));
+
+                // Chequeo rápido del total contra el saldo actual (el chequeo
+                // real y definitivo ocurre de todas formas en cada débito).
+                const consultaSaldo = await (await clienteStub.fetch('http://do/', {
+                    method: 'POST',
+                    body: JSON.stringify({ accion: 'consultar', clienteId: auth.id })
+                })).json();
+                const totalSolicitado = items.reduce((acc, it) => acc + it.monto, 0);
+                if (totalSolicitado > consultaSaldo.saldo) {
+                    return Response.json(
+                        { ok: false, error: 'El total de la lista supera tu saldo disponible' },
+                        { status: 400 }
+                    );
+                }
+
+                const aplicados = [];
+
+                for (const item of items) {
+                    const reserva = await (await sorteoStub.fetch('http://do/', {
+                        method: 'POST',
+                        body: JSON.stringify({ accion: 'reservar', sorteoId, numero: item.numero, monto: item.monto })
+                    })).json();
+
+                    if (!reserva.ok) {
+                        await revertirLote(sorteoStub, clienteStub, sorteoId, auth.id, aplicados);
+                        return Response.json(
+                            { ok: false, error: `Número ${item.numero}: ${reserva.error}` },
+                            { status: 400 }
+                        );
+                    }
+
+                    const debito = await (await clienteStub.fetch('http://do/', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            accion: 'debitar_compra', clienteId: auth.id, sorteoId,
+                            numero: item.numero, monto: item.monto
+                        })
+                    })).json();
+
+                    if (!debito.ok) {
+                        await sorteoStub.fetch('http://do/', {
+                            method: 'POST',
+                            body: JSON.stringify({ accion: 'liberar', sorteoId, numero: item.numero, monto: item.monto })
+                        });
+                        await revertirLote(sorteoStub, clienteStub, sorteoId, auth.id, aplicados);
+                        return Response.json({ ok: false, error: debito.error }, { status: 400 });
+                    }
+
+                    aplicados.push({ numero: item.numero, monto: item.monto, compraId: debito.compraId });
+                }
+
+                return Response.json({ ok: true, saldo: consultaSaldo.saldo - totalSolicitado, totalComprado: totalSolicitado, compras: aplicados.length });
             }
 
             // ============================================================
@@ -378,6 +564,16 @@ export default {
                 return Response.json({ ok: true });
             }
 
+            if (path === '/api/staff' && method === 'GET') {
+                if (!auth || auth.tipo !== 'staff') return noAutorizado();
+                if (!(await tienePermiso(env.DB, auth.id, auth.rol, 'gestionar_staff'))) return sinPermiso();
+
+                const { results } = await env.DB.prepare(
+                    'SELECT id, usuario, nombre, rol, activo FROM staff ORDER BY nombre ASC'
+                ).all();
+                return Response.json({ ok: true, staff: results });
+            }
+
             // ============================================================
             // CREAR CUENTA DE STAFF (staff con permiso gestionar_staff)
             // ============================================================
@@ -407,6 +603,12 @@ export default {
                 return Response.json({ ok: true, staffId: nuevoStaff.id });
             }
 
+            if (path === '/api/permisos' && method === 'GET') {
+                if (!auth || auth.tipo !== 'staff') return noAutorizado();
+                const { results } = await env.DB.prepare('SELECT clave, descripcion FROM permisos').all();
+                return Response.json({ ok: true, permisos: results });
+            }
+
             // ============================================================
             // DAR/QUITAR UN PERMISO INDIVIDUAL A UN STAFF (override de rol)
             // (staff con permiso gestionar_staff)
@@ -433,8 +635,7 @@ export default {
         } catch (error) {
             return Response.json({ ok: false, error: error.message }, { status: 500 });
         }
-    }
-};
+}
 
 function noAutorizado() {
     return Response.json({ ok: false, error: 'No autorizado, inicia sesión de nuevo' }, { status: 401 });
@@ -442,4 +643,21 @@ function noAutorizado() {
 
 function sinPermiso() {
     return Response.json({ ok: false, error: 'No tienes permiso para esta acción' }, { status: 403 });
+}
+
+// Deshace las compras de un lote que ya se habían aplicado, porque una
+// compra posterior en la misma lista falló (todo o nada).
+async function revertirLote(sorteoStub, clienteStub, sorteoId, clienteId, aplicados) {
+    for (const item of aplicados) {
+        await sorteoStub.fetch('http://do/', {
+            method: 'POST',
+            body: JSON.stringify({ accion: 'liberar', sorteoId, numero: item.numero, monto: item.monto })
+        });
+        await clienteStub.fetch('http://do/', {
+            method: 'POST',
+            body: JSON.stringify({
+                accion: 'revertir_compra', clienteId, monto: item.monto, compraId: item.compraId
+            })
+        });
+    }
 }
