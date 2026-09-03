@@ -176,16 +176,31 @@
             </div>
 
             <div class="tarjeta">
-                <h3>Crear sorteo</h3>
+                <h3>Crear plantilla de sorteo (recurrente)</h3>
+                <p style="font-size:0.85em; color:var(--ink-soft); margin-bottom:14px;">
+                    Se crea una sola vez. El sorteo del día se genera solo,
+                    automáticamente, en cada día de la semana que marques.
+                </p>
                 <div id="mensajeSorteo"></div>
                 <div class="fila">
-                    <div class="campo"><label>Nombre</label><input type="text" id="sNombre" placeholder="Diaria 11am"></div>
+                    <div class="campo"><label>Nombre</label><input type="text" id="sNombre" placeholder="Nica 11am"></div>
                     <div class="campo"><label>Banca</label><select id="sBanca"></select></div>
                 </div>
                 <div class="fila">
-                    <div class="campo"><label>Fecha</label><input type="date" id="sFecha"></div>
                     <div class="campo"><label>Hora de cierre</label><input type="time" id="sHoraCierre"></div>
                     <div class="campo"><label>Multiplicador de pago</label><input type="number" id="sMultiplicador" value="70"></div>
+                </div>
+                <div class="campo">
+                    <label>Días de la semana en que aplica</label>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; font-size:0.85em;">
+                        <label><input type="checkbox" id="diaLunes"> Lun</label>
+                        <label><input type="checkbox" id="diaMartes"> Mar</label>
+                        <label><input type="checkbox" id="diaMiercoles"> Mié</label>
+                        <label><input type="checkbox" id="diaJueves"> Jue</label>
+                        <label><input type="checkbox" id="diaViernes"> Vie</label>
+                        <label><input type="checkbox" id="diaSabado"> Sáb</label>
+                        <label><input type="checkbox" id="diaDomingo"> Dom</label>
+                    </div>
                 </div>
                 <div class="fila">
                     <div class="campo">
@@ -204,11 +219,16 @@
                     <div class="campo"><label>% máximo del total del sorteo</label><input type="number" id="sPorcentajeMaximo"></div>
                     <div class="campo"><label>Piso garantizado por número (C$)</label><input type="number" id="sMontoMinimo" value="0"></div>
                 </div>
-                <button class="boton boton-oro boton-full" onclick="crearSorteo()">Crear sorteo</button>
+                <button class="boton boton-oro boton-full" onclick="crearPlantilla()">Crear plantilla</button>
             </div>
 
             <div class="tarjeta">
-                <h3>Sorteos</h3>
+                <h3>Plantillas creadas</h3>
+                <div id="listaPlantillas"><div class="vacio">Cargando...</div></div>
+            </div>
+
+            <div class="tarjeta">
+                <h3>Sorteos de hoy</h3>
                 <div id="listaSorteosStaff"><div class="vacio">Cargando...</div></div>
             </div>
         </div>
@@ -346,7 +366,7 @@
             if (tab) tab.classList.toggle('activo', s.id === id);
         });
         if (id === 'Pendientes') cargarPendientes();
-        if (id === 'Sorteos') { cargarBancasSelect(); cargarSorteosStaff(); }
+        if (id === 'Sorteos') { cargarBancasSelect(); cargarPlantillas(); cargarSorteosStaff(); }
         if (id === 'Staff') { cargarStaff(); cargarPermisosCatalogo(); }
     }
 
@@ -510,10 +530,9 @@
         ).join('') || '<option value="">Sin bancas creadas</option>';
     }
 
-    async function crearSorteo() {
+    async function crearPlantilla() {
         const msj = document.getElementById('mensajeSorteo');
         const nombre = document.getElementById('sNombre').value.trim();
-        const fecha = document.getElementById('sFecha').value;
         const horaCierre = document.getElementById('sHoraCierre').value;
         const bancaId = document.getElementById('sBanca').value;
         const multiplicadorPago = parseFloat(document.getElementById('sMultiplicador').value) || 0;
@@ -522,22 +541,82 @@
         const porcentajeMaximoDefault = parseFloat(document.getElementById('sPorcentajeMaximo').value) || null;
         const montoMinimoGarantizadoDefault = parseFloat(document.getElementById('sMontoMinimo').value) || 0;
 
-        if (!nombre || !fecha || !horaCierre) {
-            msj.innerHTML = '<div class="mensaje error">Completa nombre, fecha y hora de cierre</div>';
+        const dias = {
+            lunes: document.getElementById('diaLunes').checked,
+            martes: document.getElementById('diaMartes').checked,
+            miercoles: document.getElementById('diaMiercoles').checked,
+            jueves: document.getElementById('diaJueves').checked,
+            viernes: document.getElementById('diaViernes').checked,
+            sabado: document.getElementById('diaSabado').checked,
+            domingo: document.getElementById('diaDomingo').checked
+        };
+
+        if (!nombre || !horaCierre) {
+            msj.innerHTML = '<div class="mensaje error">Completa nombre y hora de cierre</div>';
+            return;
+        }
+        if (!Object.values(dias).some(v => v)) {
+            msj.innerHTML = '<div class="mensaje error">Marca al menos un día de la semana</div>';
             return;
         }
 
-        const data = await api('/api/sorteos', {
+        const data = await api('/api/sorteos-plantillas', {
             method: 'POST',
             body: JSON.stringify({
-                nombre, fecha, horaCierre, bancaId, multiplicadorPago,
-                tipoLimiteDefault, montoMaximoDefault, porcentajeMaximoDefault, montoMinimoGarantizadoDefault
+                nombre, horaCierre, bancaId, multiplicadorPago,
+                tipoLimiteDefault, montoMaximoDefault, porcentajeMaximoDefault, montoMinimoGarantizadoDefault,
+                dias
             })
         });
         if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
-        msj.innerHTML = '<div class="mensaje exito">Sorteo creado</div>';
+        msj.innerHTML = '<div class="mensaje exito">Plantilla creada — el sorteo de hoy ya se generó si el día actual aplica</div>';
         document.getElementById('sNombre').value = '';
+        cargarPlantillas();
         cargarSorteosStaff();
+    }
+
+    const ETIQUETAS_DIAS = { lunes:'Lun', martes:'Mar', miercoles:'Mié', jueves:'Jue', viernes:'Vie', sabado:'Sáb', domingo:'Dom' };
+
+    async function cargarPlantillas() {
+        const cont = document.getElementById('listaPlantillas');
+        const data = await api('/api/sorteos-plantillas');
+        if (!data.ok || data.plantillas.length === 0) {
+            cont.innerHTML = '<div class="vacio">No hay plantillas creadas</div>';
+            return;
+        }
+        cont.innerHTML = data.plantillas.map(p => {
+            const diasActivos = Object.keys(ETIQUETAS_DIAS).filter(d => p[d] === 1).map(d => ETIQUETAS_DIAS[d]).join(', ') || 'Ningún día';
+            return `
+                <div style="border-bottom:1px solid var(--border); padding:10px 0;">
+                    <strong>${p.nombre}</strong> · cierra ${p.hora_cierre} · x${p.multiplicador_pago}
+                    <div style="font-size:0.82em; color:var(--ink-soft); margin-top:2px;">Días: ${diasActivos}</div>
+                    <div style="margin-top:4px;">
+                        <span class="accion-link" onclick="togglePlantilla(${p.id}, ${p.activa === 1 ? 'false' : 'true'})">
+                            ${p.activa === 1 ? 'Desactivar' : 'Activar'}
+                        </span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function togglePlantilla(id, activar) {
+        // Trae la plantilla actual para no perder sus días al actualizar
+        const data = await api('/api/sorteos-plantillas');
+        const p = data.plantillas.find(x => x.id === id);
+        if (!p) return;
+
+        await api(`/api/sorteos-plantillas/${id}`, {
+            method: 'POST',
+            body: JSON.stringify({
+                activa: activar,
+                dias: {
+                    lunes: p.lunes === 1, martes: p.martes === 1, miercoles: p.miercoles === 1,
+                    jueves: p.jueves === 1, viernes: p.viernes === 1, sabado: p.sabado === 1, domingo: p.domingo === 1
+                }
+            })
+        });
+        cargarPlantillas();
     }
 
     async function cargarSorteosStaff() {
