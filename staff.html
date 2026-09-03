@@ -169,10 +169,40 @@
                 <div id="mensajeBanca"></div>
                 <div class="fila">
                     <div class="campo"><label>Nombre de la banca</label><input type="text" id="bancaNombre"></div>
-                    <div class="campo"><label>% Comisión pagar</label><input type="number" id="bancaPagar" value="0"></div>
-                    <div class="campo"><label>% Comisión recibir</label><input type="number" id="bancaRecibir" value="0"></div>
+                    <div class="campo"><label>% Mi comisión</label><input type="number" id="bancaComision" value="0"></div>
                 </div>
                 <button class="boton boton-full" onclick="crearBanca()">Crear banca</button>
+            </div>
+
+            <div class="tarjeta">
+                <h3>Cuenta con la banca</h3>
+                <div class="fila">
+                    <div class="campo"><label>Banca</label><select id="cuentaBancaSelect" onchange="cargarCuentaBanca()"></select></div>
+                </div>
+                <div class="fila">
+                    <div class="campo"><label>Desde (opcional)</label><input type="date" id="cuentaDesde" onchange="cargarCuentaBanca()"></div>
+                    <div class="campo"><label>Hasta (opcional)</label><input type="date" id="cuentaHasta" onchange="cargarCuentaBanca()"></div>
+                </div>
+                <div id="resumenCuentaBanca"><div class="vacio">Selecciona una banca</div></div>
+
+                <div id="formLiquidacion" style="display:none; margin-top:16px; border-top:1px solid var(--border); padding-top:14px;">
+                    <h3>Registrar liquidación</h3>
+                    <div id="mensajeLiquidacion"></div>
+                    <div class="fila">
+                        <div class="campo">
+                            <label>Tipo</label>
+                            <select id="liqTipo">
+                                <option value="pago_a_banca">Pago a la banca</option>
+                                <option value="cobro_de_banca">Cobro recibido de la banca</option>
+                            </select>
+                        </div>
+                        <div class="campo"><label>Monto (C$)</label><input type="number" id="liqMonto" min="1"></div>
+                    </div>
+                    <div class="campo"><label>Nota (opcional)</label><input type="text" id="liqNota"></div>
+                    <button class="boton boton-oro boton-full" onclick="registrarLiquidacion()">Registrar</button>
+
+                    <div id="historialLiquidaciones" style="margin-top:14px;"></div>
+                </div>
             </div>
 
             <div class="tarjeta">
@@ -366,7 +396,7 @@
             if (tab) tab.classList.toggle('activo', s.id === id);
         });
         if (id === 'Pendientes') cargarPendientes();
-        if (id === 'Sorteos') { cargarBancasSelect(); cargarPlantillas(); cargarSorteosStaff(); }
+        if (id === 'Sorteos') { cargarBancasSelect(); cargarBancasParaCuenta(); cargarPlantillas(); cargarSorteosStaff(); }
         if (id === 'Staff') { cargarStaff(); cargarPermisosCatalogo(); }
     }
 
@@ -506,19 +536,109 @@
 
     async function crearBanca() {
         const nombre = document.getElementById('bancaNombre').value.trim();
-        const comisionPagarPct = parseFloat(document.getElementById('bancaPagar').value) || 0;
-        const comisionRecibirPct = parseFloat(document.getElementById('bancaRecibir').value) || 0;
+        const miComisionPct = parseFloat(document.getElementById('bancaComision').value) || 0;
         const msj = document.getElementById('mensajeBanca');
         if (!nombre) { msj.innerHTML = '<div class="mensaje error">Ingresa el nombre de la banca</div>'; return; }
 
         const data = await api('/api/bancas', {
             method: 'POST',
-            body: JSON.stringify({ nombre, comisionPagarPct, comisionRecibirPct })
+            body: JSON.stringify({ nombre, miComisionPct })
         });
         if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
         msj.innerHTML = '<div class="mensaje exito">Banca creada</div>';
         document.getElementById('bancaNombre').value = '';
         cargarBancasSelect();
+        cargarBancasParaCuenta();
+    }
+
+    async function cargarBancasParaCuenta() {
+        const data = await api('/api/bancas');
+        if (!data.ok) return;
+        const select = document.getElementById('cuentaBancaSelect');
+        select.innerHTML = '<option value="">-- Elige una banca --</option>' +
+            data.bancas.map(b => `<option value="${b.id}">${b.nombre} (${b.mi_comision_pct}%)</option>`).join('');
+    }
+
+    async function cargarCuentaBanca() {
+        const bancaId = document.getElementById('cuentaBancaSelect').value;
+        const resumen = document.getElementById('resumenCuentaBanca');
+        const formLiq = document.getElementById('formLiquidacion');
+
+        if (!bancaId) {
+            resumen.innerHTML = '<div class="vacio">Selecciona una banca</div>';
+            formLiq.style.display = 'none';
+            return;
+        }
+
+        const desde = document.getElementById('cuentaDesde').value;
+        const hasta = document.getElementById('cuentaHasta').value;
+        let query = '';
+        if (desde) query += `&desde=${desde}`;
+        if (hasta) query += `&hasta=${hasta}`;
+
+        const data = await api(`/api/bancas/${bancaId}/cuenta?${query}`);
+        if (!data.ok) { resumen.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
+
+        const pendienteColor = data.pendiente > 0 ? 'var(--error)' : 'var(--success)';
+        const pendienteTexto = data.pendiente > 0
+            ? `Le debes a la banca C$${num(data.pendiente)}`
+            : `La banca te debe C$${num(Math.abs(data.pendiente))}`;
+
+        resumen.innerHTML = `
+            <table>
+                <tr><td>Ventas totales</td><td class="num">C$${num(data.ventasTotales)}</td></tr>
+                <tr><td>Mi comisión (${data.banca.miComisionPct}%)</td><td class="num">C$${num(data.miComision)}</td></tr>
+                <tr><td>Premios pagados</td><td class="num">C$${num(data.premiosPagados)}</td></tr>
+                <tr><td>Neto que le corresponde a la banca</td><td class="num">C$${num(data.netoDebido)}</td></tr>
+                <tr><td>Ya liquidado</td><td class="num">C$${num(data.yaLiquidado)}</td></tr>
+            </table>
+            <div style="margin-top:10px; font-weight:700; color:${pendienteColor};">${pendienteTexto}</div>
+        `;
+
+        formLiq.style.display = 'block';
+        cargarHistorialLiquidaciones(bancaId);
+    }
+
+    async function registrarLiquidacion() {
+        const bancaId = document.getElementById('cuentaBancaSelect').value;
+        const tipo = document.getElementById('liqTipo').value;
+        const monto = parseFloat(document.getElementById('liqMonto').value);
+        const nota = document.getElementById('liqNota').value.trim();
+        const msj = document.getElementById('mensajeLiquidacion');
+
+        if (!monto || monto <= 0) { msj.innerHTML = '<div class="mensaje error">Ingresa un monto válido</div>'; return; }
+
+        const data = await api(`/api/bancas/${bancaId}/liquidaciones`, {
+            method: 'POST',
+            body: JSON.stringify({ tipo, monto, nota })
+        });
+        if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
+
+        msj.innerHTML = '<div class="mensaje exito">Liquidación registrada</div>';
+        document.getElementById('liqMonto').value = '';
+        document.getElementById('liqNota').value = '';
+        cargarCuentaBanca();
+    }
+
+    async function cargarHistorialLiquidaciones(bancaId) {
+        const cont = document.getElementById('historialLiquidaciones');
+        const data = await api(`/api/bancas/${bancaId}/liquidaciones`);
+        if (!data.ok || data.liquidaciones.length === 0) {
+            cont.innerHTML = '<div class="vacio">Sin liquidaciones registradas</div>';
+            return;
+        }
+        cont.innerHTML = `
+            <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Nota</th></tr></thead><tbody>
+            ${data.liquidaciones.map(l => `
+                <tr>
+                    <td>${l.creado_en.split(' ')[0]}</td>
+                    <td>${l.tipo === 'pago_a_banca' ? 'Pago a banca' : 'Cobro de banca'}</td>
+                    <td class="num">C$${num(l.monto)}</td>
+                    <td>${l.nota || ''}</td>
+                </tr>
+            `).join('')}
+            </tbody></table>
+        `;
     }
 
     async function cargarBancasSelect() {
