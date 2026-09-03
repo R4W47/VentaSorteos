@@ -422,7 +422,7 @@
             msj.innerHTML = `<div class="mensaje error">${data.error}</div>`;
             return;
         }
-        msj.innerHTML = '<div class="mensaje exito">Cliente creado correctamente</div>';
+        msj.innerHTML = `<div class="mensaje exito">Cliente creado — número de cliente: <strong>${data.numeroCliente}</strong></div>`;
         document.getElementById('ccNombre').value = '';
         document.getElementById('ccUsuario').value = '';
         document.getElementById('ccPassword').value = '';
@@ -452,7 +452,7 @@
 
         cont.innerHTML = `
             <div class="cliente-info">
-                <div><strong>${clienteActual.nombre}</strong> (@${clienteActual.usuario})</div>
+                <div><strong>#${clienteActual.numero_cliente} — ${clienteActual.nombre}</strong> (@${clienteActual.usuario})</div>
                 <div>Saldo actual: <span class="num">C$${num(clienteActual.saldo)}</span></div>
             </div>
             <div id="mensajeMovimiento"></div>
