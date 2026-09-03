@@ -440,20 +440,25 @@
         }
         token = data.token;
         localStorage.setItem('token_cliente', token);
-        entrarAlApp(data.nombre);
+        localStorage.setItem('numero_cliente', data.numeroCliente || '');
+        localStorage.setItem('nombre_cliente', data.nombre || '');
+        entrarAlApp(data.nombre, data.numeroCliente);
     }
 
     function cerrarSesion() {
         localStorage.removeItem('token_cliente');
+        localStorage.removeItem('numero_cliente');
+        localStorage.removeItem('nombre_cliente');
         token = null;
         document.getElementById('app').style.display = 'none';
         document.getElementById('pantallaAcceso').style.display = 'flex';
     }
 
-    function entrarAlApp(nombre) {
+    function entrarAlApp(nombre, numeroCliente) {
         document.getElementById('pantallaAcceso').style.display = 'none';
         document.getElementById('app').style.display = 'block';
-        document.getElementById('saludoNombre').textContent = nombre ? `Hola, ${nombre}` : 'Hola';
+        const numero = numeroCliente || localStorage.getItem('numero_cliente');
+        document.getElementById('saludoNombre').textContent = numero ? `${numero} - ${nombre}` : (nombre || '');
         cargarSaldo();
         cargarSorteos();
     }
@@ -635,10 +640,11 @@
     }
 
     // ---------------------------------------------------------------
-    // Arranque: si ya hay token guardado, entra directo
+    // Arranque: si ya hay token guardado, entra directo con los datos
+    // que se guardaron la última vez que inició sesión
     // ---------------------------------------------------------------
     if (token) {
-        entrarAlApp();
+        entrarAlApp(localStorage.getItem('nombre_cliente'), localStorage.getItem('numero_cliente'));
     }
 </script>
 </body>
