@@ -440,37 +440,28 @@
         }
         token = data.token;
         localStorage.setItem('token_cliente', token);
-        localStorage.setItem('numero_cliente', data.numeroCliente || '');
-        localStorage.setItem('nombre_cliente', data.nombre || '');
-        entrarAlApp(data.nombre, data.numeroCliente);
+        entrarAlApp();
     }
 
     function cerrarSesion() {
         localStorage.removeItem('token_cliente');
-        localStorage.removeItem('numero_cliente');
-        localStorage.removeItem('nombre_cliente');
         token = null;
         document.getElementById('app').style.display = 'none';
         document.getElementById('pantallaAcceso').style.display = 'flex';
     }
 
-    function entrarAlApp(nombre, numeroCliente) {
+    function entrarAlApp() {
         document.getElementById('pantallaAcceso').style.display = 'none';
         document.getElementById('app').style.display = 'block';
-        const numero = numeroCliente || localStorage.getItem('numero_cliente');
-        document.getElementById('saludoNombre').textContent = numero ? `${numero} - ${nombre}` : (nombre || '');
-        cargarSaldo();
+        cargarPerfil();
         cargarSorteos();
     }
 
-    // ---------------------------------------------------------------
-    // Saldo
-    // ---------------------------------------------------------------
-    async function cargarSaldo() {
-        const data = await api('/api/clientes/saldo');
-        if (data.ok) {
-            document.getElementById('saldoMonto').textContent = num(data.saldo);
-        }
+    async function cargarPerfil() {
+        const data = await api('/api/clientes/perfil');
+        if (!data.ok) return;
+        document.getElementById('saludoNombre').textContent = `${data.numeroCliente} - ${data.nombre}`;
+        document.getElementById('saldoMonto').textContent = num(data.saldo);
     }
 
     // ---------------------------------------------------------------
@@ -644,7 +635,7 @@
     // que se guardaron la última vez que inició sesión
     // ---------------------------------------------------------------
     if (token) {
-        entrarAlApp(localStorage.getItem('nombre_cliente'), localStorage.getItem('numero_cliente'));
+        entrarAlApp();
     }
 </script>
 </body>
