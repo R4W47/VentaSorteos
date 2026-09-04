@@ -293,7 +293,7 @@
             </div>
             <div class="campo">
                 <label>Contraseña</label>
-                <input type="password" id="loginPassword" autocomplete="current-password">
+                <input type="password" id="loginPassword" autocomplete="current-password" onkeydown="if(event.key === 'Enter') iniciarSesion()">
             </div>
             <button class="boton" id="btnLogin" onclick="iniciarSesion()">Entrar</button>
             <p style="text-align:center; font-size:0.8em; color:var(--ink-soft); margin-top:16px;">

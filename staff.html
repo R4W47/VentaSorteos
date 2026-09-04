@@ -104,7 +104,7 @@
         </div>
         <div class="campo">
             <label>Contraseña</label>
-            <input type="password" id="loginPassword" autocomplete="current-password">
+            <input type="password" id="loginPassword" autocomplete="current-password" onkeydown="if(event.key === 'Enter') iniciarSesion()">
         </div>
         <button class="boton boton-full" id="btnLogin" onclick="iniciarSesion()">Entrar</button>
     </div>
