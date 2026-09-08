@@ -414,6 +414,15 @@
             </div>
 
             <div class="tarjeta">
+                <label class="etiqueta-seccion">Gallo tapado (números al azar)</label>
+                <div class="chips-monto">
+                    <button class="chip-monto" onclick="jugarGalloTapado(3)">x3</button>
+                    <button class="chip-monto" onclick="jugarGalloTapado(5)">x5</button>
+                    <button class="chip-monto" onclick="jugarGalloTapado(10)">x10</button>
+                </div>
+            </div>
+
+            <div class="tarjeta">
                 <label class="etiqueta-seccion">Toca los números</label>
                 <div id="mensajeColilla"></div>
                 <div class="tablero-numeros" id="tableroNumeros"></div>
@@ -626,6 +635,52 @@
         msj.innerHTML = '';
         colilla.push({ numero, monto: montoActivo });
         document.getElementById(`numero-${numero}`).classList.add('seleccionado');
+        renderizarColilla();
+    }
+
+    // Elige `cantidad` números al azar (que no estén ya en la jugada) con
+    // el monto activo, validando primero que el saldo alcance para todos.
+    function jugarGalloTapado(cantidad) {
+        const msj = document.getElementById('mensajeColilla');
+
+        if (montoActivo === null) {
+            msj.innerHTML = '<div class="mensaje error">Elige un monto arriba antes de usar el Gallo Tapado</div>';
+            return;
+        }
+
+        const totalActual = colilla.reduce((acc, item) => acc + item.monto, 0);
+        const costoNuevo = montoActivo * cantidad;
+        const saldoActual = parseFloat(document.getElementById('saldoMonto').textContent.replace(/,/g, ''));
+
+        if (totalActual + costoNuevo > saldoActual) {
+            msj.innerHTML = `<div class="mensaje error">No te alcanza el saldo para jugar ${cantidad} números de ₡${num(montoActivo)} cada uno</div>`;
+            return;
+        }
+
+        // Números disponibles: todos los que no estén ya en la jugada
+        const numerosDisponibles = [];
+        for (let i = 0; i <= 99; i++) {
+            const numero = String(i).padStart(2, '0');
+            if (!colilla.some(item => item.numero === numero)) numerosDisponibles.push(numero);
+        }
+
+        if (numerosDisponibles.length < cantidad) {
+            msj.innerHTML = '<div class="mensaje error">No hay suficientes números disponibles para elegir</div>';
+            return;
+        }
+
+        // Mezclar y tomar los primeros `cantidad`
+        for (let i = numerosDisponibles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [numerosDisponibles[i], numerosDisponibles[j]] = [numerosDisponibles[j], numerosDisponibles[i]];
+        }
+
+        numerosDisponibles.slice(0, cantidad).forEach(numero => {
+            colilla.push({ numero, monto: montoActivo });
+            document.getElementById(`numero-${numero}`)?.classList.add('seleccionado');
+        });
+
+        msj.innerHTML = `<div class="mensaje exito">Se agregaron ${cantidad} números al azar</div>`;
         renderizarColilla();
     }
 
