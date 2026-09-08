@@ -6,6 +6,7 @@
 <title>Panel de Staff</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
     :root {
         --navy: #1B2A4A;
@@ -263,6 +264,37 @@
             </div>
         </div>
 
+        <!-- ---- Listas (ventas por número, para compartir por WhatsApp) ---- -->
+        <div class="pantalla" id="pantallaListas">
+            <div class="tarjeta">
+                <div class="campo">
+                    <label>Sorteo</label>
+                    <select id="listaSorteoSelect" onchange="cargarListaVentas()"></select>
+                </div>
+            </div>
+
+            <div class="tarjeta" id="tarjetaListaResultado" style="display:none;">
+                <!-- Este div (id="listaParaImagen") es lo que se convierte en imagen -->
+                <div id="listaParaImagen" style="background:#fff; padding:16px; border-radius:10px;">
+                    <div style="text-align:center; margin-bottom:10px;">
+                        <div style="font-family:'Fraunces',serif; font-weight:700; font-size:1.2em;" id="listaTitulo"></div>
+                        <div style="font-size:0.8em; color:var(--ink-soft);" id="listaSubtitulo"></div>
+                    </div>
+                    <table style="width:100%;">
+                        <thead><tr><th>Número</th><th style="text-align:right;">Monto</th></tr></thead>
+                        <tbody id="listaTablaBody"></tbody>
+                    </table>
+                    <div style="display:flex; justify-content:space-between; font-weight:700; margin-top:10px; border-top:2px solid var(--navy); padding-top:8px;">
+                        <span>Total</span>
+                        <span id="listaTotalTexto"></span>
+                    </div>
+                </div>
+                <button class="boton boton-oro boton-full" style="margin-top:14px;" onclick="compartirListaImagen()">
+                    Compartir como imagen (WhatsApp)
+                </button>
+            </div>
+        </div>
+
         <!-- ---- Staff ---- -->
         <div class="pantalla" id="pantallaStaff">
             <div class="tarjeta">
@@ -320,6 +352,7 @@
         { id: 'Saldo',      etiqueta: 'Saldo',       permiso: null },
         { id: 'Pendientes', etiqueta: 'Recargas pendientes', permiso: 'aprobar_recargas' },
         { id: 'Sorteos',    etiqueta: 'Sorteos',     permiso: 'gestionar_sorteos' },
+        { id: 'Listas',     etiqueta: 'Listas',      permiso: 'ver_ventas' },
         { id: 'Staff',      etiqueta: 'Staff',       permiso: 'gestionar_staff' }
     ];
 
@@ -397,6 +430,7 @@
         });
         if (id === 'Pendientes') cargarPendientes();
         if (id === 'Sorteos') { cargarBancasSelect(); cargarBancasParaCuenta(); cargarPlantillas(); cargarSorteosStaff(); }
+        if (id === 'Listas') { cargarSorteosParaLista(); }
         if (id === 'Staff') { cargarStaff(); cargarPermisosCatalogo(); }
     }
 
@@ -847,6 +881,72 @@
             body: JSON.stringify({ permisoClave, concedido })
         });
         alert(concedido ? 'Permiso otorgado' : 'Permiso revocado');
+    }
+
+    // ---------------------------------------------------------------
+    // Listas: ventas por número de un sorteo, y compartir como imagen
+    // ---------------------------------------------------------------
+    async function cargarSorteosParaLista() {
+        const data = await api('/api/sorteos');
+        const select = document.getElementById('listaSorteoSelect');
+        if (!data.ok || data.sorteos.length === 0) {
+            select.innerHTML = '<option value="">No hay sorteos</option>';
+            return;
+        }
+        select.innerHTML = '<option value="">-- Elige un sorteo --</option>' +
+            data.sorteos.map(s => `<option value="${s.id}">${s.nombre} (${s.fecha})</option>`).join('');
+    }
+
+    async function cargarListaVentas() {
+        const sorteoId = document.getElementById('listaSorteoSelect').value;
+        const tarjeta = document.getElementById('tarjetaListaResultado');
+        if (!sorteoId) { tarjeta.style.display = 'none'; return; }
+
+        const data = await api(`/api/sorteos/${sorteoId}/ventas-numero`);
+        if (!data.ok) { alert(data.error); return; }
+
+        document.getElementById('listaTitulo').textContent = data.sorteo.nombre;
+        document.getElementById('listaSubtitulo').textContent = `${data.sorteo.fecha} · cierra ${data.sorteo.hora_cierre}`;
+
+        if (data.numeros.length === 0) {
+            document.getElementById('listaTablaBody').innerHTML =
+                '<tr><td colspan="2" style="text-align:center; color:var(--ink-soft); padding:14px 0;">Sin ventas todavía</td></tr>';
+        } else {
+            document.getElementById('listaTablaBody').innerHTML = data.numeros.map(n => `
+                <tr>
+                    <td style="padding:4px 0;">${n.numero}</td>
+                    <td style="text-align:right; padding:4px 0;">₡${num(n.total_vendido)}</td>
+                </tr>
+            `).join('');
+        }
+        document.getElementById('listaTotalTexto').textContent = `₡${num(data.total)}`;
+
+        tarjeta.style.display = 'block';
+    }
+
+    async function compartirListaImagen() {
+        const elemento = document.getElementById('listaParaImagen');
+        const canvas = await html2canvas(elemento, { backgroundColor: '#ffffff', scale: 2 });
+
+        canvas.toBlob(async (blob) => {
+            const nombreSorteo = document.getElementById('listaTitulo').textContent.replace(/\s+/g, '-');
+            const archivo = new File([blob], `lista-${nombreSorteo}.png`, { type: 'image/png' });
+
+            if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+                try {
+                    await navigator.share({ files: [archivo], title: 'Lista de números' });
+                } catch (e) {
+                    // El usuario canceló el share, no hacer nada
+                }
+            } else {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `lista-${nombreSorteo}.png`;
+                a.click();
+                alert('Se descargó la imagen. Ábrela desde tu galería y compártela por WhatsApp.');
+            }
+        });
     }
 
     // ---------------------------------------------------------------
