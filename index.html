@@ -169,6 +169,83 @@
         margin: -40px auto 0;
         padding: 0 16px;
     }
+    /* En pantallas más anchas (tablet/desktop), aprovechar el espacio en
+       vez de dejar la app angosta y con mucho margen vacío a los lados. */
+    @media (min-width: 700px) {
+        .contenido { max-width: 720px; }
+        header.principal { padding-left: calc(50% - 360px + 20px); padding-right: calc(50% - 360px + 20px); }
+    }
+    @media (min-width: 1000px) {
+        .contenido { max-width: 860px; }
+        header.principal { padding-left: calc(50% - 430px + 20px); padding-right: calc(50% - 430px + 20px); }
+    }
+
+    .etiqueta-seccion {
+        display: block;
+        font-size: 0.82em;
+        font-weight: 600;
+        color: var(--ink-soft);
+        margin-bottom: 10px;
+    }
+
+    /* ---- Chips de monto rápido ---- */
+    .chips-monto {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .chip-monto {
+        font-family: 'Fraunces', serif;
+        font-weight: 600;
+        padding: 10px 16px;
+        border-radius: 20px;
+        border: 1.5px solid var(--border);
+        background: var(--paper);
+        color: var(--navy);
+        cursor: pointer;
+        font-size: 0.95em;
+    }
+    .chip-monto.activo {
+        background: var(--gold);
+        border-color: var(--gold);
+        color: var(--navy);
+    }
+    .monto-activo-texto {
+        margin-top: 10px;
+        font-size: 0.82em;
+        color: var(--ink-soft);
+    }
+
+    /* ---- Tablero táctil de números ---- */
+    .tablero-numeros {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+        gap: 8px;
+    }
+    @media (min-width: 700px) {
+        .tablero-numeros { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; }
+    }
+    .boton-numero {
+        font-family: 'Fraunces', serif;
+        font-weight: 600;
+        font-size: 1.05em;
+        aspect-ratio: 1;
+        border-radius: 10px;
+        border: 1.5px solid var(--border);
+        background: var(--paper);
+        color: var(--ink);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.08s ease;
+    }
+    .boton-numero:active { transform: scale(0.92); }
+    .boton-numero.seleccionado {
+        background: var(--navy);
+        border-color: var(--navy);
+        color: var(--gold);
+    }
     .seccion-titulo {
         font-size: 0.95em;
         font-weight: 700;
@@ -311,7 +388,7 @@
             <button class="btn-salir" onclick="cerrarSesion()">Salir</button>
         </div>
         <div class="saldo-label">Tu saldo disponible</div>
-        <div class="saldo-monto num">C$<span id="saldoMonto">0.00</span></div>
+        <div class="saldo-monto num">₡<span id="saldoMonto">0.00</span></div>
     </header>
 
     <div class="contenido">
@@ -326,22 +403,20 @@
             </div>
 
             <div class="tarjeta">
-                <div id="mensajeColilla"></div>
-                <div class="fila">
-                    <div class="campo">
-                        <label>Número</label>
-                        <input type="text" id="colNumero" maxlength="2" inputmode="numeric" placeholder="00">
-                    </div>
-                    <div class="campo">
-                        <label>Monto (C$)</label>
-                        <input type="number" id="colMonto" min="1">
-                    </div>
+                <label class="etiqueta-seccion">Monto por número</label>
+                <div class="chips-monto" id="chipsMonto">
+                    <button class="chip-monto" onclick="elegirMontoPreset(200)">₡200</button>
+                    <button class="chip-monto" onclick="elegirMontoPreset(500)">₡500</button>
+                    <button class="chip-monto" onclick="elegirMontoPreset(1000)">₡1.000</button>
+                    <button class="chip-monto" onclick="elegirMontoPersonalizado()">Otro monto</button>
                 </div>
-                <label style="display:flex; align-items:center; gap:6px; font-size:0.85em; color:var(--ink-soft); margin-bottom:12px;">
-                    <input type="checkbox" id="colRepetirMonto" style="width:auto;">
-                    Repetir este monto en el siguiente número
-                </label>
-                <button class="boton boton-full" onclick="agregarAColilla()">+ Agregar a la jugada</button>
+                <div id="montoActivoTexto" class="monto-activo-texto">Elige un monto para empezar a tocar el tablero</div>
+            </div>
+
+            <div class="tarjeta">
+                <label class="etiqueta-seccion">Toca los números</label>
+                <div id="mensajeColilla"></div>
+                <div class="tablero-numeros" id="tableroNumeros"></div>
             </div>
 
             <div class="tarjeta" id="tarjetaColilla" style="display:none;">
@@ -349,7 +424,7 @@
                 <div id="listaColilla"></div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin:14px 0; font-weight:600;">
                     <span>Total</span>
-                    <span class="num" style="font-size:1.4em;">C$<span id="totalColilla">0.00</span></span>
+                    <span class="num" style="font-size:1.4em;">₡<span id="totalColilla">0.00</span></span>
                 </div>
                 <button class="boton boton-oro boton-full" id="btnComprarLote" onclick="confirmarCompraLote()">Comprar jugada</button>
             </div>
@@ -373,7 +448,7 @@
                 </p>
                 <div id="mensajeRecarga"></div>
                 <div class="campo">
-                    <label>Monto recargado (C$)</label>
+                    <label>Monto recargado (₡)</label>
                     <input type="number" id="recargaMonto" min="1">
                 </div>
                 <div class="campo">
@@ -455,6 +530,7 @@
         document.getElementById('app').style.display = 'block';
         cargarPerfil();
         cargarSorteos();
+        generarTablero();
     }
 
     async function cargarPerfil() {
@@ -493,38 +569,70 @@
     }
 
     // ---------------------------------------------------------------
-    // Colilla: agregar números, mostrar lista, totalizar
+    // Tablero táctil: elegir monto, tocar números, mostrar colilla
     // ---------------------------------------------------------------
-    let colilla = [];
+    let colilla = [];       // [{ numero, monto }]
+    let montoActivo = null;
 
-    function agregarAColilla() {
-        const numero = document.getElementById('colNumero').value.trim();
-        const monto = parseFloat(document.getElementById('colMonto').value);
-        const repetirMonto = document.getElementById('colRepetirMonto').checked;
+    function generarTablero() {
+        const tablero = document.getElementById('tableroNumeros');
+        let html = '';
+        for (let i = 0; i <= 99; i++) {
+            const numero = String(i).padStart(2, '0');
+            html += `<button class="boton-numero" id="numero-${numero}" onclick="toggleNumero('${numero}')">${numero}</button>`;
+        }
+        tablero.innerHTML = html;
+    }
+
+    function elegirMontoPreset(monto) {
+        montoActivo = monto;
+        actualizarChipsActivos();
+    }
+
+    function elegirMontoPersonalizado() {
+        const valor = prompt('¿Qué monto quieres jugar por número?');
+        const monto = parseFloat(valor);
+        if (!monto || monto <= 0) return;
+        montoActivo = monto;
+        actualizarChipsActivos();
+    }
+
+    function actualizarChipsActivos() {
+        document.querySelectorAll('.chip-monto').forEach(chip => chip.classList.remove('activo'));
+        if (montoActivo !== null) {
+            document.getElementById('montoActivoTexto').textContent =
+                `Tocando el tablero se juega ₡${num(montoActivo)} por número`;
+        }
+    }
+
+    function toggleNumero(numero) {
         const msj = document.getElementById('mensajeColilla');
+        const yaExiste = colilla.findIndex(item => item.numero === numero);
 
-        if (!numero || !monto || monto <= 0) {
-            msj.innerHTML = '<div class="mensaje error">Escribe un número y un monto válidos</div>';
+        if (yaExiste !== -1) {
+            // Ya estaba seleccionado: quitarlo
+            colilla.splice(yaExiste, 1);
+            document.getElementById(`numero-${numero}`).classList.remove('seleccionado');
+            msj.innerHTML = '';
+            renderizarColilla();
             return;
         }
 
-        colilla.push({ numero, monto });
-        msj.innerHTML = '';
-
-        // Limpiar el número siempre; el monto solo se limpia si NO se
-        // marcó "repetir este monto" (así se puede seguir agregando
-        // números distintos con el mismo monto sin retiparlo).
-        document.getElementById('colNumero').value = '';
-        if (!repetirMonto) {
-            document.getElementById('colMonto').value = '';
+        if (montoActivo === null) {
+            msj.innerHTML = '<div class="mensaje error">Elige un monto arriba antes de tocar el tablero</div>';
+            return;
         }
-        document.getElementById('colNumero').focus();
 
+        msj.innerHTML = '';
+        colilla.push({ numero, monto: montoActivo });
+        document.getElementById(`numero-${numero}`).classList.add('seleccionado');
         renderizarColilla();
     }
 
     function quitarDeColilla(indice) {
+        const numero = colilla[indice].numero;
         colilla.splice(indice, 1);
+        document.getElementById(`numero-${numero}`)?.classList.remove('seleccionado');
         renderizarColilla();
     }
 
@@ -542,7 +650,7 @@
             <div class="historial-fila">
                 <div><strong class="num">${item.numero}</strong></div>
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <span class="num">C$${num(item.monto)}</span>
+                    <span class="num">₡${num(item.monto)}</span>
                     <span class="accion-quitar" onclick="quitarDeColilla(${i})" style="color:var(--error); cursor:pointer; font-size:0.85em;">Quitar</span>
                 </div>
             </div>
@@ -589,6 +697,7 @@
 
         document.getElementById('saldoMonto').textContent = num(data.saldo);
         msj.innerHTML = '<div class="mensaje exito">¡Jugada aplicada con éxito!</div>';
+        document.querySelectorAll('.boton-numero.seleccionado').forEach(b => b.classList.remove('seleccionado'));
         colilla = [];
         renderizarColilla();
     }

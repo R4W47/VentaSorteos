@@ -196,7 +196,7 @@
                                 <option value="cobro_de_banca">Cobro recibido de la banca</option>
                             </select>
                         </div>
-                        <div class="campo"><label>Monto (C$)</label><input type="number" id="liqMonto" min="1"></div>
+                        <div class="campo"><label>Monto (₡)</label><input type="number" id="liqMonto" min="1"></div>
                     </div>
                     <div class="campo"><label>Nota (opcional)</label><input type="text" id="liqNota"></div>
                     <button class="boton boton-oro boton-full" onclick="registrarLiquidacion()">Registrar</button>
@@ -243,11 +243,11 @@
                     </div>
                 </div>
                 <div class="fila" id="camposLimiteMonto" style="display:none;">
-                    <div class="campo"><label>Monto máximo por número (C$)</label><input type="number" id="sMontoMaximo"></div>
+                    <div class="campo"><label>Monto máximo por número (₡)</label><input type="number" id="sMontoMaximo"></div>
                 </div>
                 <div class="fila" id="camposLimitePorcentaje" style="display:none;">
                     <div class="campo"><label>% máximo del total del sorteo</label><input type="number" id="sPorcentajeMaximo"></div>
-                    <div class="campo"><label>Piso garantizado por número (C$)</label><input type="number" id="sMontoMinimo" value="0"></div>
+                    <div class="campo"><label>Piso garantizado por número (₡)</label><input type="number" id="sMontoMinimo" value="0"></div>
                 </div>
                 <button class="boton boton-oro boton-full" onclick="crearPlantilla()">Crear plantilla</button>
             </div>
@@ -285,7 +285,7 @@
                     </div>
                 </div>
                 <div class="fila">
-                    <div class="campo"><label>Salario base (C$)</label><input type="number" id="stSalario" value="0"></div>
+                    <div class="campo"><label>Salario base (₡)</label><input type="number" id="stSalario" value="0"></div>
                     <div class="campo"><label>% comisión sobre ingresos (opcional)</label><input type="number" id="stComision"></div>
                 </div>
                 <button class="boton boton-oro boton-full" onclick="crearStaff()">Crear cuenta</button>
@@ -453,12 +453,12 @@
         cont.innerHTML = `
             <div class="cliente-info">
                 <div><strong>#${clienteActual.numero_cliente} — ${clienteActual.nombre}</strong> (@${clienteActual.usuario})</div>
-                <div>Saldo actual: <span class="num">C$${num(clienteActual.saldo)}</span></div>
+                <div>Saldo actual: <span class="num">₡${num(clienteActual.saldo)}</span></div>
             </div>
             <div id="mensajeMovimiento"></div>
             ${(puedeRecargar || puedeRetirar) ? `
                 <div class="fila">
-                    <div class="campo"><label>Monto (C$)</label><input type="number" id="movimientoMonto" min="1"></div>
+                    <div class="campo"><label>Monto (₡)</label><input type="number" id="movimientoMonto" min="1"></div>
                 </div>
                 <div class="fila">
                     ${puedeRecargar ? '<button class="boton boton-oro" onclick="recargarEfectivo()">Recargar en efectivo</button>' : ''}
@@ -478,7 +478,7 @@
             body: JSON.stringify({ clienteId: clienteActual.id, monto })
         });
         if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
-        msj.innerHTML = `<div class="mensaje exito">Recarga aplicada. Nuevo saldo: C$${num(data.saldo)}</div>`;
+        msj.innerHTML = `<div class="mensaje exito">Recarga aplicada. Nuevo saldo: ₡${num(data.saldo)}</div>`;
         clienteActual.saldo = data.saldo;
     }
 
@@ -492,7 +492,7 @@
             body: JSON.stringify({ clienteId: clienteActual.id, monto })
         });
         if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
-        msj.innerHTML = `<div class="mensaje exito">Retiro aplicado. Nuevo saldo: C$${num(data.saldo)}</div>`;
+        msj.innerHTML = `<div class="mensaje exito">Retiro aplicado. Nuevo saldo: ₡${num(data.saldo)}</div>`;
         clienteActual.saldo = data.saldo;
     }
 
@@ -511,7 +511,7 @@
             ${data.recargas.map(r => `
                 <tr>
                     <td>${r.cliente_nombre}</td>
-                    <td class="num">C$${num(r.monto)}</td>
+                    <td class="num">₡${num(r.monto)}</td>
                     <td><a href="${r.comprobante_url}" target="_blank">Ver</a></td>
                     <td><span class="accion-link" onclick="aprobarRecarga(${r.id})">Aprobar</span></td>
                 </tr>
@@ -581,16 +581,16 @@
 
         const pendienteColor = data.pendiente > 0 ? 'var(--error)' : 'var(--success)';
         const pendienteTexto = data.pendiente > 0
-            ? `Le debes a la banca C$${num(data.pendiente)}`
-            : `La banca te debe C$${num(Math.abs(data.pendiente))}`;
+            ? `Le debes a la banca ₡${num(data.pendiente)}`
+            : `La banca te debe ₡${num(Math.abs(data.pendiente))}`;
 
         resumen.innerHTML = `
             <table>
-                <tr><td>Ventas totales</td><td class="num">C$${num(data.ventasTotales)}</td></tr>
-                <tr><td>Mi comisión (${data.banca.miComisionPct}%)</td><td class="num">C$${num(data.miComision)}</td></tr>
-                <tr><td>Premios pagados</td><td class="num">C$${num(data.premiosPagados)}</td></tr>
-                <tr><td>Neto que le corresponde a la banca</td><td class="num">C$${num(data.netoDebido)}</td></tr>
-                <tr><td>Ya liquidado</td><td class="num">C$${num(data.yaLiquidado)}</td></tr>
+                <tr><td>Ventas totales</td><td class="num">₡${num(data.ventasTotales)}</td></tr>
+                <tr><td>Mi comisión (${data.banca.miComisionPct}%)</td><td class="num">₡${num(data.miComision)}</td></tr>
+                <tr><td>Premios pagados</td><td class="num">₡${num(data.premiosPagados)}</td></tr>
+                <tr><td>Neto que le corresponde a la banca</td><td class="num">₡${num(data.netoDebido)}</td></tr>
+                <tr><td>Ya liquidado</td><td class="num">₡${num(data.yaLiquidado)}</td></tr>
             </table>
             <div style="margin-top:10px; font-weight:700; color:${pendienteColor};">${pendienteTexto}</div>
         `;
@@ -633,7 +633,7 @@
                 <tr>
                     <td>${l.creado_en.split(' ')[0]}</td>
                     <td>${l.tipo === 'pago_a_banca' ? 'Pago a banca' : 'Cobro de banca'}</td>
-                    <td class="num">C$${num(l.monto)}</td>
+                    <td class="num">₡${num(l.monto)}</td>
                     <td>${l.nota || ''}</td>
                 </tr>
             `).join('')}
@@ -777,7 +777,7 @@
             body: JSON.stringify({ numeroGanador: numeroGanador.trim() })
         });
         if (data.ok) {
-            alert(`Premios pagados a ${data.ganadores} cliente(s). Total: C$${num(data.totalPagado)}`);
+            alert(`Premios pagados a ${data.ganadores} cliente(s). Total: ₡${num(data.totalPagado)}`);
             cargarSorteosStaff();
         } else {
             alert(data.error);
