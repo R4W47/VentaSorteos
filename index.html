@@ -573,7 +573,7 @@
         }
         sorteosCache = data.sorteos;
         select.innerHTML = data.sorteos.map(s =>
-            `<option value="${s.id}">${s.nombre} — cierra ${s.hora_cierre} (x${s.multiplicador_pago})</option>`
+            `<option value="${s.id}">${s.nombre}</option>`
         ).join('');
     }
 
