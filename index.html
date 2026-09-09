@@ -398,7 +398,7 @@
             <div class="tarjeta">
                 <div class="campo">
                     <label>Sorteo</label>
-                    <select id="selectSorteo"></select>
+                    <select id="selectSorteo" onchange="onCambiarSorteo()"></select>
                 </div>
             </div>
 
@@ -411,6 +411,15 @@
                     <button class="chip-monto" onclick="elegirMontoPersonalizado()">Otro monto</button>
                 </div>
                 <div id="montoActivoTexto" class="monto-activo-texto">Elige un monto para empezar a tocar el tablero</div>
+            </div>
+
+            <div class="tarjeta" id="tarjetaReventado" style="display:none;">
+                <label class="etiqueta-seccion">Reventado (opcional)</label>
+                <div class="campo">
+                    <label>Monto de reventado por número (no puede ser mayor al monto principal)</label>
+                    <input type="number" id="montoReventadoInput" min="0" oninput="actualizarMontoReventado()">
+                </div>
+                <div id="reventadoTexto" class="monto-activo-texto">Sin reventado — solo se jugará el monto principal</div>
             </div>
 
             <div class="tarjeta">
@@ -575,13 +584,39 @@
         select.innerHTML = data.sorteos.map(s =>
             `<option value="${s.id}">${s.nombre}</option>`
         ).join('');
+        onCambiarSorteo();
+    }
+
+    // Muestra/oculta la tarjeta de reventado según si el sorteo elegido
+    // la ofrece, y limpia cualquier monto de reventado que ya no aplique.
+    function onCambiarSorteo() {
+        const sorteoId = document.getElementById('selectSorteo').value;
+        const sorteo = sorteosCache.find(s => String(s.id) === String(sorteoId));
+        const tarjeta = document.getElementById('tarjetaReventado');
+
+        if (sorteo && sorteo.tiene_reventado === 1) {
+            tarjeta.style.display = 'block';
+        } else {
+            tarjeta.style.display = 'none';
+            document.getElementById('montoReventadoInput').value = '';
+            montoReventadoActivo = 0;
+        }
     }
 
     // ---------------------------------------------------------------
     // Tablero táctil: elegir monto, tocar números, mostrar colilla
     // ---------------------------------------------------------------
-    let colilla = [];       // [{ numero, monto }]
+    let colilla = [];       // [{ numero, monto, montoReventado }]
     let montoActivo = null;
+    let montoReventadoActivo = 0;
+
+    function actualizarMontoReventado() {
+        const valor = parseFloat(document.getElementById('montoReventadoInput').value);
+        montoReventadoActivo = valor > 0 ? valor : 0;
+        document.getElementById('reventadoTexto').textContent = montoReventadoActivo > 0
+            ? `Se jugará ₡${num(montoReventadoActivo)} de reventado en cada número que toques`
+            : 'Sin reventado — solo se jugará el monto principal';
+    }
 
     function generarTablero() {
         const tablero = document.getElementById('tableroNumeros');
@@ -632,8 +667,13 @@
             return;
         }
 
+        if (montoReventadoActivo > montoActivo) {
+            msj.innerHTML = '<div class="mensaje error">El monto de reventado no puede ser mayor al monto principal</div>';
+            return;
+        }
+
         msj.innerHTML = '';
-        colilla.push({ numero, monto: montoActivo });
+        colilla.push({ numero, monto: montoActivo, montoReventado: montoReventadoActivo });
         document.getElementById(`numero-${numero}`).classList.add('seleccionado');
         renderizarColilla();
     }
@@ -648,8 +688,8 @@
             return;
         }
 
-        const totalActual = colilla.reduce((acc, item) => acc + item.monto, 0);
-        const costoNuevo = montoActivo * cantidad;
+        const totalActual = colilla.reduce((acc, item) => acc + item.monto + (item.montoReventado || 0), 0);
+        const costoNuevo = (montoActivo + montoReventadoActivo) * cantidad;
         const saldoActual = parseFloat(document.getElementById('saldoMonto').textContent.replace(/,/g, ''));
 
         if (totalActual + costoNuevo > saldoActual) {
@@ -676,7 +716,7 @@
         }
 
         numerosDisponibles.slice(0, cantidad).forEach(numero => {
-            colilla.push({ numero, monto: montoActivo });
+            colilla.push({ numero, monto: montoActivo, montoReventado: montoReventadoActivo });
             document.getElementById(`numero-${numero}`)?.classList.add('seleccionado');
         });
 
@@ -705,13 +745,15 @@
             <div class="historial-fila">
                 <div><strong class="num">${item.numero}</strong></div>
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <span class="num">₡${num(item.monto)}</span>
+                    <span class="num">
+                        ₡${num(item.monto)}${item.montoReventado > 0 ? ` <span style="color:var(--gold); font-size:0.8em;">+ ₡${num(item.montoReventado)} rev.</span>` : ''}
+                    </span>
                     <span class="accion-quitar" onclick="quitarDeColilla(${i})" style="color:var(--error); cursor:pointer; font-size:0.85em;">Quitar</span>
                 </div>
             </div>
         `).join('');
 
-        const total = colilla.reduce((acc, item) => acc + item.monto, 0);
+        const total = colilla.reduce((acc, item) => acc + item.monto + (item.montoReventado || 0), 0);
         document.getElementById('totalColilla').textContent = num(total);
     }
 
@@ -731,7 +773,7 @@
             return;
         }
 
-        const total = colilla.reduce((acc, item) => acc + item.monto, 0);
+        const total = colilla.reduce((acc, item) => acc + item.monto + (item.montoReventado || 0), 0);
         const saldoActual = parseFloat(document.getElementById('saldoMonto').textContent.replace(/,/g, ''));
         if (total > saldoActual) {
             msj.innerHTML = '<div class="mensaje error">El total de la jugada supera tu saldo disponible</div>';
@@ -753,6 +795,8 @@
         document.getElementById('saldoMonto').textContent = num(data.saldo);
         msj.innerHTML = '<div class="mensaje exito">¡Jugada aplicada con éxito!</div>';
         document.querySelectorAll('.boton-numero.seleccionado').forEach(b => b.classList.remove('seleccionado'));
+        document.getElementById('montoReventadoInput').value = '';
+        montoReventadoActivo = 0;
         colilla = [];
         renderizarColilla();
     }

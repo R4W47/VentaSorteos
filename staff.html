@@ -222,6 +222,12 @@
                     <div class="campo"><label>Multiplicador de pago</label><input type="number" id="sMultiplicador" value="70"></div>
                 </div>
                 <div class="campo">
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:normal;">
+                        <input type="checkbox" id="sTieneReventado" style="width:auto;">
+                        Este sorteo ofrece apuesta de reventado (ej. la Tica)
+                    </label>
+                </div>
+                <div class="campo">
                     <label>Días de la semana en que aplica</label>
                     <div style="display:flex; gap:10px; flex-wrap:wrap; font-size:0.85em;">
                         <label><input type="checkbox" id="diaLunes"> Lun</label>
@@ -690,6 +696,7 @@
         const horaCierre = document.getElementById('sHoraCierre').value;
         const bancaId = document.getElementById('sBanca').value;
         const multiplicadorPago = parseFloat(document.getElementById('sMultiplicador').value) || 0;
+        const tieneReventado = document.getElementById('sTieneReventado').checked;
         const tipoLimiteDefault = document.getElementById('sTipoLimite').value;
         const montoMaximoDefault = parseFloat(document.getElementById('sMontoMaximo').value) || null;
         const porcentajeMaximoDefault = parseFloat(document.getElementById('sPorcentajeMaximo').value) || null;
@@ -717,7 +724,7 @@
         const data = await api('/api/sorteos-plantillas', {
             method: 'POST',
             body: JSON.stringify({
-                nombre, horaCierre, bancaId, multiplicadorPago,
+                nombre, horaCierre, bancaId, multiplicadorPago, tieneReventado,
                 tipoLimiteDefault, montoMaximoDefault, porcentajeMaximoDefault, montoMinimoGarantizadoDefault,
                 dias
             })
@@ -743,6 +750,7 @@
             return `
                 <div style="border-bottom:1px solid var(--border); padding:10px 0;">
                     <strong>${p.nombre}</strong> · cierra ${p.hora_cierre} · x${p.multiplicador_pago}
+                    ${p.tiene_reventado === 1 ? ' · <span style="color:var(--gold);">con reventado</span>' : ''}
                     <div style="font-size:0.82em; color:var(--ink-soft); margin-top:2px;">Días: ${diasActivos}</div>
                     <div style="margin-top:4px;">
                         <span class="accion-link" onclick="togglePlantilla(${p.id}, ${p.activa === 1 ? 'false' : 'true'})">
@@ -764,6 +772,7 @@
             method: 'POST',
             body: JSON.stringify({
                 activa: activar,
+                tieneReventado: p.tiene_reventado === 1,
                 dias: {
                     lunes: p.lunes === 1, martes: p.martes === 1, miercoles: p.miercoles === 1,
                     jueves: p.jueves === 1, viernes: p.viernes === 1, sabado: p.sabado === 1, domingo: p.domingo === 1
@@ -790,7 +799,7 @@
                         ${s.estado === 'abierto' && misPermisos.includes('gestionar_sorteos')
                             ? `<span class="accion-link" onclick="cerrarSorteo(${s.id})">Cerrar</span>` : ''}
                         ${s.estado === 'cerrado' && misPermisos.includes('registrar_resultado')
-                            ? `<span class="accion-link" onclick="registrarResultado(${s.id})">Resultado</span>` : ''}
+                            ? `<span class="accion-link" onclick="registrarResultado(${s.id}, ${s.tiene_reventado === 1})">Resultado</span>` : ''}
                     </td>
                 </tr>
             `).join('')}
@@ -803,12 +812,23 @@
         if (data.ok) cargarSorteosStaff();
     }
 
-    async function registrarResultado(id) {
+    async function registrarResultado(id, tieneReventado) {
         const numeroGanador = prompt('¿Cuál fue el número ganador?');
         if (!numeroGanador) return;
+
+        let bolita = null;
+        if (tieneReventado) {
+            bolita = prompt('¿La bolita del reventado salió "blanca" o "roja"?');
+            if (!['blanca', 'roja'].includes((bolita || '').toLowerCase())) {
+                alert('Debes escribir exactamente "blanca" o "roja"');
+                return;
+            }
+            bolita = bolita.toLowerCase();
+        }
+
         const data = await api(`/api/sorteos/${id}/resultado`, {
             method: 'POST',
-            body: JSON.stringify({ numeroGanador: numeroGanador.trim() })
+            body: JSON.stringify({ numeroGanador: numeroGanador.trim(), bolita })
         });
         if (data.ok) {
             alert(`Premios pagados a ${data.ganadores} cliente(s). Total: ₡${num(data.totalPagado)}`);
