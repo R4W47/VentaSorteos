@@ -495,6 +495,7 @@
     let token = localStorage.getItem('token_cliente') || null;
     let sorteoSeleccionado = null;
     let sorteosCache = [];
+    let nombreNegocio = 'Mi Negocio';
 
     // ---------------------------------------------------------------
     // Utilidades de llamadas a la API
@@ -507,7 +508,17 @@
     }
 
     function num(n) {
-        return (n || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 });
+        return (n || 0).toLocaleString('es-CR', { minimumFractionDigits: 2 });
+    }
+
+    // Convierte la marca de tiempo guardada (UTC) a la hora local de
+    // quien está viendo la colilla.
+    function formatearFechaHora(marcaUTC) {
+        if (!marcaUTC) return '';
+        const fecha = new Date(marcaUTC.replace(' ', 'T') + 'Z');
+        return fecha.toLocaleString('es-CR', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
     }
 
     // ---------------------------------------------------------------
@@ -549,6 +560,14 @@
         cargarPerfil();
         cargarSorteos();
         generarTablero();
+        cargarNombreNegocio();
+    }
+
+    async function cargarNombreNegocio() {
+        const data = await api('/api/configuracion');
+        if (data.ok && data.config.nombre_negocio) {
+            nombreNegocio = data.config.nombre_negocio;
+        }
     }
 
     async function cargarPerfil() {
@@ -845,11 +864,15 @@
 
             return `
                 <div class="tarjeta">
-                    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+                    <div style="text-align:center; margin-bottom:8px;">
+                        <div class="num" style="font-weight:700; font-size:1.1em;">Tiempos ${nombreNegocio}</div>
+                        <div style="font-size:0.8em; color:var(--ink-soft);">Colilla #${grupo.numeroColilla}</div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;">
                         <strong>${grupo.nombre}</strong>
                         <span style="font-size:0.8em; color:${colorEstado}; font-weight:600;">${etiquetaEstado}</span>
                     </div>
-                    <div style="font-size:0.78em; color:var(--ink-soft); margin-bottom:8px;">${grupo.fecha} · cierra ${grupo.horaCierre}</div>
+                    <div style="font-size:0.78em; color:var(--ink-soft); margin-bottom:8px;">${formatearFechaHora(grupo.horaCompra)}</div>
                     ${grupo.numeroGanador !== null
                         ? `<div style="font-size:0.85em; margin-bottom:8px;">Número ganador: <strong class="num">${grupo.numeroGanador}</strong>${grupo.bolita ? ` · Bolita: <strong>${grupo.bolita}</strong>` : ''}</div>`
                         : ''}

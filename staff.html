@@ -283,7 +283,8 @@
                 <!-- Este div (id="listaParaImagen") es lo que se convierte en imagen -->
                 <div id="listaParaImagen" style="background:#fff; padding:16px; border-radius:10px;">
                     <div style="text-align:center; margin-bottom:10px;">
-                        <div style="font-family:'Fraunces',serif; font-weight:700; font-size:1.2em;" id="listaTitulo"></div>
+                        <div style="font-family:'Fraunces',serif; font-weight:700; font-size:1.3em;" id="listaNegocioTitulo"></div>
+                        <div style="font-weight:600; margin-top:2px;" id="listaTitulo"></div>
                         <div style="font-size:0.8em; color:var(--ink-soft);" id="listaSubtitulo"></div>
                     </div>
                     <table style="width:100%;">
@@ -298,6 +299,35 @@
                 <button class="boton boton-oro boton-full" style="margin-top:14px;" onclick="compartirListaImagen()">
                     Compartir como imagen (WhatsApp)
                 </button>
+            </div>
+        </div>
+
+        <!-- ---- Colillas premiadas ---- -->
+        <div class="pantalla" id="pantallaPremiados">
+            <div class="tarjeta">
+                <div class="campo">
+                    <label>Filtrar por sorteo (opcional)</label>
+                    <select id="premiadosSorteoSelect" onchange="cargarColillasPremiadas()"></select>
+                </div>
+            </div>
+            <div class="tarjeta">
+                <div id="listaColillasPremiadas"><div class="vacio">Cargando...</div></div>
+            </div>
+        </div>
+
+        <!-- ---- Configuración ---- -->
+        <div class="pantalla" id="pantallaConfig">
+            <div class="tarjeta">
+                <h3>Nombre del negocio</h3>
+                <p style="font-size:0.85em; color:var(--ink-soft); margin-bottom:14px;">
+                    Aparece como encabezado en las colillas del cliente y en las listas compartidas.
+                </p>
+                <div id="mensajeConfig"></div>
+                <div class="campo">
+                    <label>Nombre</label>
+                    <input type="text" id="configNombreNegocio" placeholder="Mi Negocio">
+                </div>
+                <button class="boton boton-oro boton-full" onclick="guardarConfiguracion()">Guardar</button>
             </div>
         </div>
 
@@ -347,6 +377,7 @@
     let token = localStorage.getItem('token_staff') || null;
     let misPermisos = [];
     let miRol = null;
+    let nombreNegocioCache = 'Mi Negocio';
     let clienteActual = null;
     let bancasCache = [];
     let permisosCatalogo = [];
@@ -359,7 +390,9 @@
         { id: 'Pendientes', etiqueta: 'Recargas pendientes', permiso: 'aprobar_recargas' },
         { id: 'Sorteos',    etiqueta: 'Sorteos',     permiso: 'gestionar_sorteos' },
         { id: 'Listas',     etiqueta: 'Listas',      permiso: 'ver_ventas' },
-        { id: 'Staff',      etiqueta: 'Staff',       permiso: 'gestionar_staff' }
+        { id: 'Premiados',  etiqueta: 'Colillas premiadas', permiso: 'ver_ventas' },
+        { id: 'Staff',      etiqueta: 'Staff',       permiso: 'gestionar_staff' },
+        { id: 'Config',     etiqueta: 'Configuración', permiso: 'gestionar_configuracion' }
     ];
 
     async function api(ruta, opciones = {}) {
@@ -370,7 +403,7 @@
     }
 
     function num(n) {
-        return (n || 0).toLocaleString('es-NI', { minimumFractionDigits: 2 });
+        return (n || 0).toLocaleString('es-CR', { minimumFractionDigits: 2 });
     }
 
     // ---------------------------------------------------------------
@@ -412,6 +445,11 @@
         const permData = await api('/api/staff/permisos');
         misPermisos = permData.ok ? permData.permisos : [];
 
+        const configData = await api('/api/configuracion');
+        if (configData.ok && configData.config.nombre_negocio) {
+            nombreNegocioCache = configData.config.nombre_negocio;
+        }
+
         construirTabs();
         cambiarPantalla(SECCIONES.find(s => tieneAcceso(s)).id);
     }
@@ -437,7 +475,9 @@
         if (id === 'Pendientes') cargarPendientes();
         if (id === 'Sorteos') { cargarBancasSelect(); cargarBancasParaCuenta(); cargarPlantillas(); cargarSorteosStaff(); }
         if (id === 'Listas') { cargarSorteosParaLista(); }
+        if (id === 'Premiados') { cargarSorteosParaPremiados(); cargarColillasPremiadas(); }
         if (id === 'Staff') { cargarStaff(); cargarPermisosCatalogo(); }
+        if (id === 'Config') { cargarConfiguracion(); }
     }
 
     // ---------------------------------------------------------------
@@ -925,8 +965,9 @@
         const data = await api(`/api/sorteos/${sorteoId}/ventas-numero`);
         if (!data.ok) { alert(data.error); return; }
 
+        document.getElementById('listaNegocioTitulo').textContent = `Tiempos ${nombreNegocioCache}`;
         document.getElementById('listaTitulo').textContent = data.sorteo.nombre;
-        document.getElementById('listaSubtitulo').textContent = `${data.sorteo.fecha} · cierra ${data.sorteo.hora_cierre}`;
+        document.getElementById('listaSubtitulo').textContent = data.sorteo.fecha;
 
         if (data.numeros.length === 0) {
             document.getElementById('listaTablaBody').innerHTML =
@@ -967,6 +1008,77 @@
                 alert('Se descargó la imagen. Ábrela desde tu galería y compártela por WhatsApp.');
             }
         });
+    }
+
+    // ---------------------------------------------------------------
+    // Colillas premiadas
+    // ---------------------------------------------------------------
+    async function cargarSorteosParaPremiados() {
+        const data = await api('/api/sorteos');
+        const select = document.getElementById('premiadosSorteoSelect');
+        if (!data.ok) return;
+        select.innerHTML = '<option value="">Todos los sorteos</option>' +
+            data.sorteos.map(s => `<option value="${s.id}">${s.nombre} (${s.fecha})</option>`).join('');
+    }
+
+    async function cargarColillasPremiadas() {
+        const sorteoId = document.getElementById('premiadosSorteoSelect').value;
+        const cont = document.getElementById('listaColillasPremiadas');
+        const query = sorteoId ? `?sorteoId=${sorteoId}` : '';
+
+        const data = await api(`/api/colillas-premiadas${query}`);
+        if (!data.ok) { cont.innerHTML = `<div class="vacio">${data.error}</div>`; return; }
+        if (data.colillas.length === 0) {
+            cont.innerHTML = '<div class="vacio">No hay colillas premiadas todavía</div>';
+            return;
+        }
+
+        cont.innerHTML = `
+            <table>
+                <thead><tr><th>Sorteo</th><th>Número</th><th>Cliente</th><th style="text-align:right;">Jugado</th><th style="text-align:right;">Ganado</th></tr></thead>
+                <tbody>
+                    ${data.colillas.map(c => `
+                        <tr>
+                            <td>${c.sorteo_nombre}<br><span style="color:var(--ink-soft); font-size:0.78em;">${c.fecha}</span></td>
+                            <td class="num">${c.numero}</td>
+                            <td>#${c.numero_cliente} ${c.cliente_nombre}</td>
+                            <td class="num" style="text-align:right;">₡${num(c.monto + c.monto_reventado)}</td>
+                            <td class="num" style="text-align:right; color:var(--success); font-weight:600;">₡${num(c.premio_pagado)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight:700; border-top:2px solid var(--navy);">
+                        <td colspan="3">Totales</td>
+                        <td class="num" style="text-align:right;">₡${num(data.totalJugado)}</td>
+                        <td class="num" style="text-align:right; color:var(--success);">₡${num(data.totalGanado)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        `;
+    }
+
+    // ---------------------------------------------------------------
+    // Configuración del negocio
+    // ---------------------------------------------------------------
+    async function cargarConfiguracion() {
+        const data = await api('/api/configuracion');
+        if (data.ok && data.config.nombre_negocio) {
+            document.getElementById('configNombreNegocio').value = data.config.nombre_negocio;
+        }
+    }
+
+    async function guardarConfiguracion() {
+        const nombreNegocio = document.getElementById('configNombreNegocio').value.trim();
+        const msj = document.getElementById('mensajeConfig');
+        if (!nombreNegocio) { msj.innerHTML = '<div class="mensaje error">Escribe un nombre</div>'; return; }
+
+        const data = await api('/api/configuracion', {
+            method: 'POST',
+            body: JSON.stringify({ nombreNegocio })
+        });
+        if (!data.ok) { msj.innerHTML = `<div class="mensaje error">${data.error}</div>`; return; }
+        msj.innerHTML = '<div class="mensaje exito">Guardado</div>';
     }
 
     // ---------------------------------------------------------------
