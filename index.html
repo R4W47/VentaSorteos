@@ -451,8 +451,8 @@
         <!-- ---- Pantalla: Historial ---- -->
         <div class="pantalla" id="pantallaHistorial">
             <div class="seccion-titulo">Historial</div>
-            <div class="tarjeta" id="listaHistorial">
-                <div class="vacio">Cargando historial...</div>
+            <div id="listaHistorial">
+                <div class="tarjeta"><div class="vacio">Cargando historial...</div></div>
             </div>
         </div>
 
@@ -802,13 +802,71 @@
     }
 
     // ---------------------------------------------------------------
-    // Historial (a partir del saldo — de momento solo lectura simple)
+    // Historial: compras agrupadas por sorteo, con el resultado si ya
+    // se jugó (número ganador y si cada número propio ganó o no)
     // ---------------------------------------------------------------
     async function cargarHistorial() {
         const cont = document.getElementById('listaHistorial');
-        cont.innerHTML = '<div class="vacio">El historial detallado se agrega en la siguiente ronda.</div>';
-        // Nota: falta un endpoint GET /api/clientes/historial en el Worker
-        // que devuelva movimientos_saldo del cliente para listar aquí.
+        const data = await api('/api/clientes/historial');
+
+        if (!data.ok) {
+            cont.innerHTML = `<div class="tarjeta"><div class="vacio">${data.error}</div></div>`;
+            return;
+        }
+        if (data.historial.length === 0) {
+            cont.innerHTML = '<div class="tarjeta"><div class="vacio">Todavía no has jugado ningún número</div></div>';
+            return;
+        }
+
+        cont.innerHTML = data.historial.map(grupo => {
+            const etiquetaEstado = grupo.estado === 'abierto' ? 'En juego'
+                : grupo.estado === 'cerrado' ? 'Cerrado, esperando resultado'
+                : 'Jugado';
+            const colorEstado = grupo.estado === 'abierto' ? 'var(--gold)'
+                : grupo.estado === 'cerrado' ? 'var(--ink-soft)'
+                : (grupo.totalGanado > 0 ? 'var(--success)' : 'var(--ink-soft)');
+
+            const filasNumeros = grupo.numeros.map(n => `
+                <div class="historial-fila">
+                    <div>
+                        <strong class="num">${n.numero}</strong>
+                        ${n.gano ? ' <span style="color:var(--success); font-size:0.8em; font-weight:700;">¡GANÓ!</span>' : ''}
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="num">
+                            ₡${num(n.monto)}${n.montoReventado > 0 ? ` <span style="color:var(--gold); font-size:0.8em;">+₡${num(n.montoReventado)} rev.</span>` : ''}
+                        </div>
+                        ${(n.premioTica + n.premioReventado) > 0
+                            ? `<div class="monto-positivo" style="font-size:0.85em;">Ganó ₡${num(n.premioTica + n.premioReventado)}</div>`
+                            : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="tarjeta">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+                        <strong>${grupo.nombre}</strong>
+                        <span style="font-size:0.8em; color:${colorEstado}; font-weight:600;">${etiquetaEstado}</span>
+                    </div>
+                    <div style="font-size:0.78em; color:var(--ink-soft); margin-bottom:8px;">${grupo.fecha} · cierra ${grupo.horaCierre}</div>
+                    ${grupo.numeroGanador !== null
+                        ? `<div style="font-size:0.85em; margin-bottom:8px;">Número ganador: <strong class="num">${grupo.numeroGanador}</strong>${grupo.bolita ? ` · Bolita: <strong>${grupo.bolita}</strong>` : ''}</div>`
+                        : ''}
+                    ${filasNumeros}
+                    <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-size:0.9em;">
+                        <span>Total jugado</span>
+                        <span class="num">₡${num(grupo.totalJugado)}</span>
+                    </div>
+                    ${grupo.totalGanado > 0 ? `
+                        <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--success);">
+                            <span>Total ganado</span>
+                            <span class="num">₡${num(grupo.totalGanado)}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
     }
 
     // ---------------------------------------------------------------
